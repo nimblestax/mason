@@ -20,6 +20,7 @@ RULES = {
     "MSN109": "missing-sql-file",
     "MSN110": "keys-without-sequence-by",
     "MSN111": "upsert-field-without-keys",
+    "MSN112": "path-missing-for-environment",
     "MSN201": "unresolved-logical-name",
     "MSN901": "usage-error",
     "MSN902": "unknown-environment",

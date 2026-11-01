@@ -25,7 +25,10 @@ def load(root: Path) -> Project:
     _require_valid(config.check(root, root / platform.FILE_NAME, platform.KIND))
     contract = platform.load(root)
     folders = {domain: root / "domains" / domain for domain in contract.domains}
-    _require_valid([p for folder in folders.values() for p in _problems(root, folder)])
+    environments = tuple(contract.hosts)
+    _require_valid(
+        [p for folder in folders.values() for p in _problems(root, folder, environments)]
+    )
     sources: list[Source] = []
     models: list[Model] = []
     for domain, folder in folders.items():
@@ -34,10 +37,10 @@ def load(root: Path) -> Project:
     return Project(root, contract, tuple(sources), tuple(models))
 
 
-def _problems(root: Path, folder: Path) -> list[Diagnostic]:
+def _problems(root: Path, folder: Path, environments: tuple[str, ...]) -> list[Diagnostic]:
     problems: list[Diagnostic] = []
     for file in sorted(folder.glob("sources/*.yaml")):
-        problems += _source_problems(root, file)
+        problems += _source_problems(root, file, environments)
     for file in sorted(folder.glob("models/*.yaml")):
         problems += _model_problems(root, file)
     for file in sorted(folder.glob("models/*.sql")):
@@ -46,12 +49,16 @@ def _problems(root: Path, folder: Path) -> list[Diagnostic]:
     return problems
 
 
-def _source_problems(root: Path, file: Path) -> list[Diagnostic]:
+def _source_problems(root: Path, file: Path, environments: tuple[str, ...]) -> list[Diagnostic]:
     problems = config.check(root, file, source.KIND)
     if problems:
         return problems
-    silver = yaml.safe_load(file.read_text()).get("silver", {})
-    return config.silver_problems(_relative(root, file), silver)
+    content = yaml.safe_load(file.read_text())
+    relative = _relative(root, file)
+    return [
+        *config.path_problems(relative, content["path"], environments),
+        *config.silver_problems(relative, content.get("silver", {})),
+    ]
 
 
 def _model_problems(root: Path, file: Path) -> list[Diagnostic]:

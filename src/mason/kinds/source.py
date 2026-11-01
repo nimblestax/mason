@@ -18,9 +18,14 @@ SCHEMAS = {
             "kind": {"const": "source", "description": "The Kind of this file."},
             "version": {"const": 1, "description": "The schema version of this Kind."},
             "path": {
-                "type": "string",
+                "type": ["string", "object"],
                 "minLength": 1,
-                "description": "Where the files land, such as a Unity Catalog Volume path.",
+                "minProperties": 1,
+                "additionalProperties": {"type": "string", "minLength": 1},
+                "description": (
+                    "Where the files land, such as a Unity Catalog Volume path: "
+                    "one value, or a value per Environment."
+                ),
             },
             "format": {
                 "enum": ["avro", "binaryFile", "csv", "json", "orc", "parquet", "text", "xml"],
@@ -74,9 +79,12 @@ class Silver:
 class Source:
     domain: str
     name: str
-    path: str
+    path: str | dict[str, str]
     format: str
     silver: Silver = Silver()
+
+    def path_in(self, env: str) -> str:
+        return self.path if isinstance(self.path, str) else self.path[env]
 
 
 def load(domain: str, file: Path) -> Source:
@@ -96,12 +104,12 @@ def load(domain: str, file: Path) -> Source:
     )
 
 
-def generate(source: Source, bronze: str, silver: str) -> str:
+def generate(source: Source, path: str, bronze: str, silver: str) -> str:
     """Bronze keeps every row as it landed and can't be reset, so it can always be replayed."""
     return f"""CREATE OR REFRESH STREAMING TABLE {bronze}
 TBLPROPERTIES ('pipelines.reset.allowed' = 'false')
 AS SELECT *
-FROM STREAM read_files('{source.path}', format => '{source.format}');
+FROM STREAM read_files('{path}', format => '{source.format}');
 
 {_silver(source, bronze, silver)}"""
 

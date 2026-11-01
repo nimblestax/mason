@@ -79,7 +79,7 @@ def test_a_source_lands_in_bronze_and_silver(project: Path):
 
     ingest = (project / "build/src/sales/ingest/orders.sql").read_text()
     assert "STREAMING TABLE ${catalog_sales_bronze}.${schema_sales_bronze}.orders" in ingest
-    assert "read_files('/Volumes/dev_sales/bronze/landing/orders'" in ingest
+    assert "read_files('${path_sales__orders}'" in ingest
     assert "'pipelines.reset.allowed' = 'false'" in ingest
     assert "STREAMING TABLE ${catalog_sales_silver}.${schema_sales_silver}.orders" in ingest
     assert "STREAM(${catalog_sales_bronze}.${schema_sales_bronze}.orders)" in ingest

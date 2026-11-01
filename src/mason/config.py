@@ -1,5 +1,6 @@
 """Checks a config file against its Kind before anything reads it."""
 
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
@@ -89,6 +90,22 @@ def silver_problems(file: str, silver: dict) -> list[Diagnostic]:
         return [] if "sequence_by" in silver else [_keys_without_sequence_by(file)]
     upsert_fields = ("sequence_by", "scd", "delete_when")
     return [_upsert_field_without_keys(file, name) for name in upsert_fields if name in silver]
+
+
+def path_problems(file: str, path: str | dict, environments: Iterable[str]) -> list[Diagnostic]:
+    """Environments a per-Environment `path` leaves out. A single value serves them all."""
+    if isinstance(path, str):
+        return []
+    return [_path_missing(file, env) for env in environments if env not in path]
+
+
+def _path_missing(file: str, env: str) -> Diagnostic:
+    return error(
+        "MSN112",
+        file,
+        f"`path` has no value for the Environment `{env}`.",
+        f"Add `{env}` under `path`, or give `path` a single value for every Environment.",
+    )
 
 
 def _keys_without_sequence_by(file: str) -> Diagnostic:

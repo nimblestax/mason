@@ -20,7 +20,7 @@ def generated_files(project: Project) -> dict[Path, str]:
         bronze = names.placeholders(LogicalName(item.domain, bronze_layer, item.name))
         silver = names.placeholders(LogicalName(item.domain, silver_layer, item.name))
         path = Path("src") / item.domain / "ingest" / f"{item.name}.sql"
-        files[path] = source.generate(item, bronze, silver)
+        files[path] = source.generate(item, names.path_placeholder(item), bronze, silver)
     for item in project.models:
         target = names.placeholders(LogicalName(item.domain, gold_layer, item.name))
         path = Path("src") / item.domain / "gold" / f"{item.name}.sql"
@@ -42,4 +42,4 @@ def write_package(project: Project) -> Path:
 def print_for(project: Project, env: str) -> str:
     """Every generated file as runnable SQL for one Environment."""
     code = "\n".join(generated_files(project).values())
-    return names.resolve(code, project.platform, env)
+    return names.resolve(code, project, env)
