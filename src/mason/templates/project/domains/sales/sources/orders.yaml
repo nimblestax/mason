@@ -1,0 +1,4 @@
+kind: source
+version: 1
+path: /Volumes/dev_sales/bronze/landing/orders
+format: json
