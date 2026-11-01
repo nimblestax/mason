@@ -1,0 +1,14 @@
+kind: platform
+version: 1
+name: {name}
+environments:
+  dev:
+    host: {host}
+naming:
+  catalog: "{{env}}_{{domain}}"
+  schema: "{{layer}}"
+  layers:
+    sources: [bronze, silver]
+    models: [gold]
+domains:
+  - sales
