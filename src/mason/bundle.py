@@ -14,7 +14,7 @@ def render(project: Project) -> str:
     pipelines = {}
     tasks = []
     for domain in platform.domains:
-        if any(source.domain == domain for source in project.sources):
+        if any(item.domain == domain for item in (*project.sources, *project.seeds)):
             pipelines[f"{domain}_ingest"] = _pipeline(project, domain, "ingest")
             tasks.append(_task(f"{domain}_ingest", needs=None))
         if any(model.domain == domain for model in project.models):

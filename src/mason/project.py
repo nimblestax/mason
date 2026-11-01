@@ -7,9 +7,10 @@ import yaml
 
 from mason import config
 from mason.diagnostics import Diagnostic
-from mason.kinds import model, platform, source
+from mason.kinds import model, platform, seed, source
 from mason.kinds.model import Model
 from mason.kinds.platform import Platform
+from mason.kinds.seed import Seed
 from mason.kinds.source import Source
 
 
@@ -18,6 +19,7 @@ class Project:
     root: Path
     platform: Platform
     sources: tuple[Source, ...]
+    seeds: tuple[Seed, ...]
     models: tuple[Model, ...]
 
 
@@ -27,17 +29,21 @@ def load(root: Path) -> Project:
     folders = {domain: root / "domains" / domain for domain in contract.domains}
     _require_valid([p for folder in folders.values() for p in _problems(root, folder)])
     sources: list[Source] = []
+    seeds: list[Seed] = []
     models: list[Model] = []
     for domain, folder in folders.items():
         sources += [source.load(domain, f) for f in sorted(folder.glob("sources/*.yaml"))]
+        seeds += [seed.load(domain, f) for f in sorted(folder.glob("seeds/*.yaml"))]
         models += [model.load(domain, f) for f in sorted(folder.glob("models/*.yaml"))]
-    return Project(root, contract, tuple(sources), tuple(models))
+    return Project(root, contract, tuple(sources), tuple(seeds), tuple(models))
 
 
 def _problems(root: Path, folder: Path) -> list[Diagnostic]:
     problems: list[Diagnostic] = []
     for file in sorted(folder.glob("sources/*.yaml")):
         problems += _source_problems(root, file)
+    for file in sorted(folder.glob("seeds/*.yaml")):
+        problems += _seed_problems(root, file)
     for file in sorted(folder.glob("models/*.yaml")):
         problems += _model_problems(root, file)
     for file in sorted(folder.glob("models/*.sql")):
@@ -52,6 +58,10 @@ def _source_problems(root: Path, file: Path) -> list[Diagnostic]:
         return problems
     silver = yaml.safe_load(file.read_text()).get("silver", {})
     return config.silver_problems(_relative(root, file), silver)
+
+
+def _seed_problems(root: Path, file: Path) -> list[Diagnostic]:
+    return config.check(root, file, seed.KIND) or seed.problems(root, file)
 
 
 def _model_problems(root: Path, file: Path) -> list[Diagnostic]:
