@@ -1,4 +1,4 @@
-"""Checks a config file against its Kind before anything reads it (ADR 0006)."""
+"""Checks a config file against its Kind before anything reads it."""
 
 from pathlib import Path
 from typing import Any
