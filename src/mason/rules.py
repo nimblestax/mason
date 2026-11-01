@@ -1,7 +1,7 @@
 """Project rules. `mason validate` runs these with no workspace."""
 
 from mason import sql
-from mason.diagnostics import Diagnostic
+from mason.diagnostics import Diagnostic, error
 from mason.names import LogicalName
 from mason.project import Project
 
@@ -28,13 +28,9 @@ def _tables(project: Project) -> set[LogicalName]:
 
 def _unresolved(project: Project, file, read: LogicalName) -> Diagnostic:
     logical = f"{read.domain}.{read.layer}.{read.entity}"
-    return Diagnostic(
-        rule="MSN201",
-        name="unresolved-logical-name",
-        severity="error",
-        file=file.relative_to(project.root).as_posix(),
-        line=None,
-        message=f"{logical} isn't a table in this project.",
-        fix="Declare a Source or Gold Model with this name, or correct the Logical Name.",
-        docs="",
+    return error(
+        "MSN201",
+        file.relative_to(project.root).as_posix(),
+        f"{logical} isn't a table in this project.",
+        "Declare a Source or Gold Model with this name, or correct the Logical Name.",
     )
