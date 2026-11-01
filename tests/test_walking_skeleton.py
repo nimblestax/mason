@@ -6,6 +6,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+import yaml
 from typer.testing import CliRunner
 
 from mason import deploy
@@ -187,6 +188,14 @@ def test_github_ci_files_are_thin_calls_to_mason_with_no_secret(project: Path):
     assert "id-token: write" in merge
     assert "DATABRICKS_AUTH_TYPE: github-oidc" in merge
     assert "secrets." not in pull_request + merge
+
+
+def test_generated_code_is_uploaded_even_though_init_gitignores_the_package(project: Path):
+    mason(project, "compile")
+
+    assert "build/" in (project / ".gitignore").read_text()
+    package = yaml.safe_load((project / "build/databricks.yml").read_text())
+    assert package["sync"]["include"] == ["src/**"]
 
 
 def test_a_deleted_model_leaves_the_package(project: Path):

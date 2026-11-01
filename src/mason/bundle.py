@@ -25,6 +25,8 @@ def render(project: Project) -> str:
     return yaml.safe_dump(
         {
             "bundle": {"name": platform.name},
+            # Bundle sync skips gitignored files, and `mason init` gitignores the package.
+            "sync": {"include": ["src/**"]},
             "variables": {name: {"description": name} for name in variables},
             "targets": {
                 env: {
