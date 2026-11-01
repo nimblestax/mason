@@ -25,10 +25,7 @@ def load(root: Path) -> Project:
     _require_valid(config.check(root, root / platform.FILE_NAME, platform.KIND))
     contract = platform.load(root)
     folders = {domain: root / "domains" / domain for domain in contract.domains}
-    environments = tuple(contract.hosts)
-    _require_valid(
-        [p for folder in folders.values() for p in _problems(root, folder, environments)]
-    )
+    _require_valid([p for folder in folders.values() for p in _problems(root, folder)])
     sources: list[Source] = []
     models: list[Model] = []
     for domain, folder in folders.items():
@@ -37,10 +34,10 @@ def load(root: Path) -> Project:
     return Project(root, contract, tuple(sources), tuple(models))
 
 
-def _problems(root: Path, folder: Path, environments: tuple[str, ...]) -> list[Diagnostic]:
+def _problems(root: Path, folder: Path) -> list[Diagnostic]:
     problems: list[Diagnostic] = []
     for file in sorted(folder.glob("sources/*.yaml")):
-        problems += _source_problems(root, file, environments)
+        problems += _source_problems(root, file)
     for file in sorted(folder.glob("models/*.yaml")):
         problems += _model_problems(root, file)
     for file in sorted(folder.glob("models/*.sql")):
@@ -49,16 +46,12 @@ def _problems(root: Path, folder: Path, environments: tuple[str, ...]) -> list[D
     return problems
 
 
-def _source_problems(root: Path, file: Path, environments: tuple[str, ...]) -> list[Diagnostic]:
+def _source_problems(root: Path, file: Path) -> list[Diagnostic]:
     problems = config.check(root, file, source.KIND)
     if problems:
         return problems
-    content = yaml.safe_load(file.read_text())
-    relative = _relative(root, file)
-    return [
-        *config.path_problems(relative, content["path"], environments),
-        *config.silver_problems(relative, content.get("silver", {})),
-    ]
+    silver = yaml.safe_load(file.read_text()).get("silver", {})
+    return config.silver_problems(_relative(root, file), silver)
 
 
 def _model_problems(root: Path, file: Path) -> list[Diagnostic]:

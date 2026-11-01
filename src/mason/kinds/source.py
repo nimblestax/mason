@@ -18,13 +18,11 @@ SCHEMAS = {
             "kind": {"const": "source", "description": "The Kind of this file."},
             "version": {"const": 1, "description": "The schema version of this Kind."},
             "path": {
-                "type": ["string", "object"],
+                "type": "string",
                 "minLength": 1,
-                "minProperties": 1,
-                "additionalProperties": {"type": "string", "minLength": 1},
                 "description": (
-                    "Where the files land, such as a Unity Catalog Volume path: "
-                    "one value, or a value per Environment."
+                    "Where the files land, such as a Unity Catalog Volume path. "
+                    "`{env}` becomes the Environment's name."
                 ),
             },
             "format": {
@@ -79,12 +77,13 @@ class Silver:
 class Source:
     domain: str
     name: str
-    path: str | dict[str, str]
+    path: str
     format: str
     silver: Silver = Silver()
 
     def path_in(self, env: str) -> str:
-        return self.path if isinstance(self.path, str) else self.path[env]
+        # Only `{env}`, because any other braces in a path are a glob for `read_files`.
+        return self.path.replace("{env}", env)
 
 
 def load(domain: str, file: Path) -> Source:

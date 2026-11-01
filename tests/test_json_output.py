@@ -227,7 +227,6 @@ REGISTERED_RULES = {
     "MSN109": "missing-sql-file",
     "MSN110": "keys-without-sequence-by",
     "MSN111": "upsert-field-without-keys",
-    "MSN112": "path-missing-for-environment",
     "MSN201": "unresolved-logical-name",
     "MSN901": "usage-error",
     "MSN902": "unknown-environment",
@@ -274,9 +273,6 @@ INVALID_PROJECTS = {
     "MSN109": lambda project: (project / f"{MODEL}.sql").unlink(),
     "MSN110": replacing(SOURCE, "format: json\n", "format: json\nsilver:\n  keys: [order_id]\n"),
     "MSN111": replacing(SOURCE, "format: json\n", "format: json\nsilver:\n  scd: 2\n"),
-    "MSN112": replacing(
-        SOURCE, "path: /Volumes/dev_sales/bronze/landing/orders\n", "path:\n  prod: /elsewhere\n"
-    ),
     "MSN201": lambda project: (project / f"{MODEL}.sql").write_text("SELECT * FROM a.b.c"),
 }
 

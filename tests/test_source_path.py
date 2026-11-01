@@ -1,4 +1,4 @@
-"""A Source's `path`: one value, or one per Environment, kept out of generated code."""
+"""A Source's `path`: one value that may name `{env}`, kept out of generated code."""
 
 import json
 import os
@@ -14,32 +14,32 @@ from mason.cli import app
 runner = CliRunner()
 
 SOURCE = "domains/sales/sources/orders.yaml"
-SINGLE_PATH = "path: /Volumes/dev_sales/bronze/landing/orders\n"
-PER_ENVIRONMENT_PATH = """path:
-  dev: /Volumes/dev_sales/bronze/landing/orders
-  test: /Volumes/test_sales/bronze/landing/orders
-  prod: abfss://landing@prod.dfs.core.windows.net/orders
-"""
+STARTER_PATH = "path: /Volumes/{env}_sales/bronze/landing/orders\n"
 
 
 def mason(project: Path, *args: str):
     return runner.invoke(app, [*args, "--project", str(project)])
 
 
+def add_environments(project: Path, host: str | None = None) -> None:
+    contract = project / "mason.platform.yaml"
+    content = yaml.safe_load(contract.read_text())
+    host = host or content["environments"]["dev"]["host"]
+    content["environments"] = {env: {"host": host} for env in ("dev", "test", "prod")}
+    contract.write_text(yaml.safe_dump(content, sort_keys=False))
+
+
 @pytest.fixture
 def project(tmp_path: Path) -> Path:
     assert mason(tmp_path, "init").exit_code == 0
-    contract = tmp_path / "mason.platform.yaml"
-    content = yaml.safe_load(contract.read_text())
-    host = content["environments"]["dev"]["host"]
-    content["environments"] = {env: {"host": host} for env in ("dev", "test", "prod")}
-    contract.write_text(yaml.safe_dump(content, sort_keys=False))
+    add_environments(tmp_path)
     return tmp_path
 
 
-def declare_path(project: Path, block: str) -> None:
+def declare_path(project: Path, line: str) -> None:
     file = project / SOURCE
-    file.write_text(file.read_text().replace(SINGLE_PATH, block))
+    assert STARTER_PATH in file.read_text()
+    file.write_text(file.read_text().replace(STARTER_PATH, line))
 
 
 def package(project: Path) -> tuple[str, dict]:
@@ -49,99 +49,78 @@ def package(project: Path) -> tuple[str, dict]:
     return code, yaml.safe_load((project / "build/databricks.yml").read_text())
 
 
-def test_a_per_environment_path_compiles_to_one_file_with_a_setting_for_each_target(
-    project: Path,
-):
-    declare_path(project, PER_ENVIRONMENT_PATH)
+def path_setting_per_target(bundle: dict) -> dict[str, str]:
+    return {env: t["variables"]["path_sales__orders"] for env, t in bundle["targets"].items()}
 
+
+def test_a_path_naming_env_compiles_to_one_file_with_a_setting_for_each_target(project: Path):
     code, bundle = package(project)
 
     assert "read_files('${path_sales__orders}', format => 'json')" in code
     assert [f.name for f in (project / "build/src/sales/ingest").iterdir()] == ["orders.sql"]
-    assert {env: t["variables"]["path_sales__orders"] for env, t in bundle["targets"].items()} == {
+    assert path_setting_per_target(bundle) == {
         "dev": "/Volumes/dev_sales/bronze/landing/orders",
         "test": "/Volumes/test_sales/bronze/landing/orders",
-        "prod": "abfss://landing@prod.dfs.core.windows.net/orders",
+        "prod": "/Volumes/prod_sales/bronze/landing/orders",
     }
 
 
-def test_a_path_missing_for_an_environment_fails_validation_with_a_rule_id(project: Path):
-    declare_path(project, "path:\n  dev: /Volumes/dev_sales/bronze/landing/orders\n")
+def test_a_path_without_env_is_one_shared_location_and_stays_valid(project: Path):
+    declare_path(project, "path: /Volumes/shared/landing/orders\n")
 
-    result = mason(project, "validate", "--json")
+    _, bundle = package(project)
 
-    assert result.exit_code == 1, result.output
-    missing = json.loads(result.stdout)["diagnostics"]
-    assert [d["rule"] for d in missing] == ["MSN112", "MSN112"]
-    assert {d["file"] for d in missing} == {SOURCE}
-    assert "`test`" in missing[0]["message"] + missing[1]["message"]
-    assert "`prod`" in missing[0]["message"] + missing[1]["message"]
-    assert "path" in missing[0]["fix"]
-
-
-def test_a_single_path_goes_to_every_target_from_the_same_generated_code(project: Path):
-    code, bundle = package(project)
-
-    assert "read_files('${path_sales__orders}', format => 'json')" in code
-    assert {t["variables"]["path_sales__orders"] for t in bundle["targets"].values()} == {
-        "/Volumes/dev_sales/bronze/landing/orders"
-    }
+    assert set(path_setting_per_target(bundle).values()) == {"/Volumes/shared/landing/orders"}
     assert mason(project, "validate").exit_code == 0
 
 
+def test_env_can_sit_anywhere_in_a_cloud_path(project: Path):
+    declare_path(project, "path: abfss://landing@{env}lake.dfs.core.windows.net/{env}/orders\n")
+
+    _, bundle = package(project)
+
+    assert (
+        path_setting_per_target(bundle)["prod"]
+        == "abfss://landing@prodlake.dfs.core.windows.net/prod/orders"
+    )
+
+
+def test_only_env_is_replaced_so_a_glob_keeps_its_braces(project: Path):
+    declare_path(project, "path: /Volumes/{env}_sales/landing/{2024,2025}/orders\n")
+
+    _, bundle = package(project)
+
+    assert (
+        path_setting_per_target(bundle)["test"] == "/Volumes/test_sales/landing/{2024,2025}/orders"
+    )
+
+
 def test_changing_a_path_changes_settings_and_leaves_generated_code_byte_identical(project: Path):
-    declare_path(project, PER_ENVIRONMENT_PATH)
     code_before, settings_before = package(project)
 
-    file = project / SOURCE
-    file.write_text(file.read_text().replace("prod.dfs", "elsewhere.dfs"))
+    declare_path(project, "path: /Volumes/{env}_sales/bronze/elsewhere/orders\n")
     code_after, settings_after = package(project)
 
     assert code_after == code_before
     assert settings_after != settings_before
 
 
-@pytest.mark.parametrize(
-    ("env", "real_path"),
-    [
-        ("dev", "/Volumes/dev_sales/bronze/landing/orders"),
-        ("prod", "abfss://landing@prod.dfs.core.windows.net/orders"),
-    ],
-)
-def test_compile_for_an_environment_prints_that_environments_path(
-    project: Path, env: str, real_path: str
-):
-    declare_path(project, PER_ENVIRONMENT_PATH)
-
+@pytest.mark.parametrize("env", ["dev", "prod"])
+def test_compile_for_an_environment_prints_that_environments_path(project: Path, env: str):
     result = mason(project, "compile", "--env", env)
 
     assert result.exit_code == 0, result.output
-    assert f"read_files('{real_path}', format => 'json')" in result.stdout
+    assert f"read_files('/Volumes/{env}_sales/bronze/landing/orders'" in result.stdout
     assert "${" not in result.stdout
-
-
-def test_compile_and_deploy_stop_on_a_missing_path(project: Path):
-    declare_path(project, "path:\n  dev: /Volumes/dev_sales/bronze/landing/orders\n")
-
-    for command in (("compile",), ("compile", "--env", "dev"), ("deploy", "--env", "dev")):
-        result = mason(project, *command)
-        assert result.exit_code == 1, result.output
-        assert "MSN112" in result.stdout
+    assert "{env}" not in result.stdout
 
 
 @pytest.mark.parametrize(
-    "block",
-    [
-        "path: ''\n",
-        "path: 5\n",
-        "path: {}\n",
-        "path:\n  dev: ''\n  test: /a\n  prod: /b\n",
-        "path:\n  dev: 5\n  test: /a\n  prod: /b\n",
-        "path:\n  dev: [/a]\n  test: /a\n  prod: /b\n",
-    ],
+    "line",
+    ["path: ''\n", "path: 5\n", "path: {}\n", "path:\n  dev: /a\n  prod: /b\n"],
 )
-def test_a_malformed_path_fails_against_the_schema(project: Path, block: str):
-    declare_path(project, block)
+def test_anything_but_one_non_empty_value_fails_against_the_schema(project: Path, line: str):
+    declare_path(project, line)
 
     result = mason(project, "validate", "--json")
 
@@ -170,14 +149,7 @@ def test_two_sources_whose_names_join_alike_keep_separate_settings(project: Path
 def test_every_target_passes_its_own_path_to_the_pipeline(tmp_path: Path, stub_workspace: str):
     result = runner.invoke(app, ["init", "--project", str(tmp_path), "--host", stub_workspace])
     assert result.exit_code == 0, result.output
-    contract = tmp_path / "mason.platform.yaml"
-    content = yaml.safe_load(contract.read_text())
-    content["environments"]["prod"] = {"host": stub_workspace}
-    contract.write_text(yaml.safe_dump(content, sort_keys=False))
-    declare_path(
-        tmp_path,
-        "path:\n  dev: /Volumes/dev_sales/bronze/landing/orders\n  prod: /Volumes/prod/orders\n",
-    )
+    add_environments(tmp_path, stub_workspace)
     assert mason(tmp_path, "compile").exit_code == 0
 
     environment = {
@@ -196,4 +168,6 @@ def test_every_target_passes_its_own_path_to_the_pipeline(tmp_path: Path, stub_w
 
     assert validated.returncode == 0, validated.stderr
     pipeline = json.loads(validated.stdout)["resources"]["pipelines"]["sales_ingest"]
-    assert pipeline["configuration"]["path_sales__orders"] == "/Volumes/prod/orders"
+    assert pipeline["configuration"]["path_sales__orders"] == (
+        "/Volumes/prod_sales/bronze/landing/orders"
+    )
