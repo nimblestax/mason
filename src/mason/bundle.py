@@ -3,7 +3,6 @@
 import yaml
 
 from mason import names
-from mason.kinds.platform import Platform
 from mason.project import Project
 
 REFRESH_JOB = "refresh"
@@ -11,15 +10,15 @@ REFRESH_JOB = "refresh"
 
 def render(project: Project) -> str:
     platform = project.platform
-    variables = list(names.settings(platform, next(iter(platform.hosts))))
+    variables = list(names.settings(project, next(iter(platform.hosts))))
     pipelines = {}
     tasks = []
     for domain in platform.domains:
         if any(source.domain == domain for source in project.sources):
-            pipelines[f"{domain}_ingest"] = _pipeline(platform, domain, "ingest")
+            pipelines[f"{domain}_ingest"] = _pipeline(project, domain, "ingest")
             tasks.append(_task(f"{domain}_ingest", needs=None))
         if any(model.domain == domain for model in project.models):
-            pipelines[f"{domain}_gold"] = _pipeline(platform, domain, "gold")
+            pipelines[f"{domain}_gold"] = _pipeline(project, domain, "gold")
             upstream = f"{domain}_ingest" if f"{domain}_ingest" in pipelines else None
             tasks.append(_task(f"{domain}_gold", needs=upstream))
     return yaml.safe_dump(
@@ -31,7 +30,7 @@ def render(project: Project) -> str:
             "targets": {
                 env: {
                     "workspace": {"host": host},
-                    "variables": names.settings(platform, env),
+                    "variables": names.settings(project, env),
                 }
                 for env, host in platform.hosts.items()
             },
@@ -44,9 +43,10 @@ def render(project: Project) -> str:
     )
 
 
-def _pipeline(platform: Platform, domain: str, group: str) -> dict:
+def _pipeline(project: Project, domain: str, group: str) -> dict:
+    platform = project.platform
     layer = platform.source_layers[0] if group == "ingest" else platform.model_layers[-1]
-    keys = names.settings(platform, next(iter(platform.hosts)))
+    keys = names.settings(project, next(iter(platform.hosts)))
     return {
         "name": f"{platform.name}_{domain}_{group}",
         "catalog": f"${{var.catalog_{domain}_{layer}}}",

@@ -20,7 +20,10 @@ SCHEMAS = {
             "path": {
                 "type": "string",
                 "minLength": 1,
-                "description": "Where the files land, such as a Unity Catalog Volume path.",
+                "description": (
+                    "Where the files land, such as a Unity Catalog Volume path. "
+                    "`{env}` becomes the Environment's name."
+                ),
             },
             "format": {
                 "enum": ["avro", "binaryFile", "csv", "json", "orc", "parquet", "text", "xml"],
@@ -78,6 +81,10 @@ class Source:
     format: str
     silver: Silver = Silver()
 
+    def path_in(self, env: str) -> str:
+        # Only `{env}`, because any other braces in a path are a glob for `read_files`.
+        return self.path.replace("{env}", env)
+
 
 def load(domain: str, file: Path) -> Source:
     config = yaml.safe_load(file.read_text())
@@ -96,12 +103,12 @@ def load(domain: str, file: Path) -> Source:
     )
 
 
-def generate(source: Source, bronze: str, silver: str) -> str:
+def generate(source: Source, path: str, bronze: str, silver: str) -> str:
     """Bronze keeps every row as it landed and can't be reset, so it can always be replayed."""
     return f"""CREATE OR REFRESH STREAMING TABLE {bronze}
 TBLPROPERTIES ('pipelines.reset.allowed' = 'false')
 AS SELECT *
-FROM STREAM read_files('{source.path}', format => '{source.format}');
+FROM STREAM read_files('{path}', format => '{source.format}');
 
 {_silver(source, bronze, silver)}"""
 
