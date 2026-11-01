@@ -1,4 +1,4 @@
-"""Name mapping: the only module that builds a real table name (ADR 0014)."""
+"""Name mapping: the only module that builds a real table name."""
 
 import re
 from dataclasses import dataclass

@@ -1,4 +1,4 @@
-"""Loads a Project from disk. A file's Domain comes from its folder (ADR 0006)."""
+"""Loads a Project from disk. A file's Domain comes from its folder."""
 
 from dataclasses import dataclass
 from pathlib import Path
