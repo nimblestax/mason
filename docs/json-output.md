@@ -66,6 +66,8 @@ Rule IDs are `MSN` plus three digits. An ID never changes meaning, and a retired
 | `MSN107` | `unreadable-config` | A config file is missing, isn't valid YAML or isn't a mapping. |
 | `MSN108` | `sql-without-config` | A SQL file has no config file beside it. |
 | `MSN109` | `missing-sql-file` | A model names a SQL file that doesn't exist. |
+| `MSN110` | `keys-without-sequence-by` | A Source's `silver` block has `keys` but no `sequence_by`. |
+| `MSN111` | `upsert-field-without-keys` | A Source's `silver` block has `sequence_by`, `scd` or `delete_when` but no `keys`. |
 | `MSN201` | `unresolved-logical-name` | SQL reads a table that isn't in the project. |
 | `MSN901` | `usage-error` | The command line is wrong. |
 | `MSN902` | `unknown-environment` | `--env` isn't an Environment in the project. |
@@ -73,4 +75,4 @@ Rule IDs are `MSN` plus three digits. An ID never changes meaning, and a retired
 | `MSN904` | `databricks-command-failed` | A Databricks CLI command failed. |
 | `MSN905` | `unexpected-error` | Mason stopped on something it didn't expect, with a traceback on stderr. |
 
-`mason schema <unknown kind>` reports `MSN102` and exits 2, because the mistake is on the command line. `MSN101` to `MSN109` and `MSN201` exit 1 when found in a project.
+`mason schema <unknown kind>` reports `MSN102` and exits 2, because the mistake is on the command line. `MSN101` to `MSN111` and `MSN201` exit 1 when found in a project.

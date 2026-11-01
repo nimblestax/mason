@@ -26,9 +26,48 @@ SCHEMAS = {
                 "enum": ["avro", "binaryFile", "csv", "json", "orc", "parquet", "text", "xml"],
                 "description": "The format of the files at `path`.",
             },
+            "silver": {
+                "type": "object",
+                "additionalProperties": False,
+                "description": (
+                    "How silver is written, with `keys`, `sequence_by`, `scd` and `delete_when`. "
+                    "With no keys, it is append-only."
+                ),
+                "properties": {
+                    "keys": {
+                        "type": "array",
+                        "items": {"type": "string", "minLength": 1},
+                        "minItems": 1,
+                        "uniqueItems": True,
+                        "description": "The columns that identify a row, which turn on upserts.",
+                    },
+                    "sequence_by": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The column or expression that orders changes to a key.",
+                    },
+                    "delete_when": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "A SQL condition that marks a change as a delete.",
+                    },
+                    "scd": {
+                        "enum": [1, 2],
+                        "description": "1 keeps the latest row per key, 2 keeps every version.",
+                    },
+                },
+            },
         },
     }
 }
+
+
+@dataclass(frozen=True)
+class Silver:
+    keys: tuple[str, ...] = ()
+    sequence_by: str | None = None
+    scd: int = 1
+    delete_when: str | None = None
 
 
 @dataclass(frozen=True)
@@ -37,11 +76,24 @@ class Source:
     name: str
     path: str
     format: str
+    silver: Silver = Silver()
 
 
 def load(domain: str, file: Path) -> Source:
     config = yaml.safe_load(file.read_text())
-    return Source(domain=domain, name=file.stem, path=config["path"], format=config["format"])
+    silver = config.get("silver", {})
+    return Source(
+        domain=domain,
+        name=file.stem,
+        path=config["path"],
+        format=config["format"],
+        silver=Silver(
+            keys=tuple(silver.get("keys", ())),
+            sequence_by=silver.get("sequence_by"),
+            scd=silver.get("scd", 1),
+            delete_when=silver.get("delete_when"),
+        ),
+    )
 
 
 def generate(source: Source, bronze: str, silver: str) -> str:
@@ -51,7 +103,23 @@ TBLPROPERTIES ('pipelines.reset.allowed' = 'false')
 AS SELECT *
 FROM STREAM read_files('{source.path}', format => '{source.format}');
 
-CREATE OR REFRESH STREAMING TABLE {silver}
+{_silver(source, bronze, silver)}"""
+
+
+def _silver(source: Source, bronze: str, silver: str) -> str:
+    if not source.silver.keys:
+        return f"""CREATE OR REFRESH STREAMING TABLE {silver}
 AS SELECT *
 FROM STREAM({bronze});
+"""
+    delete = (
+        f"APPLY AS DELETE WHEN {source.silver.delete_when}\n" if source.silver.delete_when else ""
+    )
+    return f"""CREATE OR REFRESH STREAMING TABLE {silver};
+
+CREATE FLOW upsert_{source.name} AS AUTO CDC INTO {silver}
+FROM STREAM({bronze})
+KEYS ({", ".join(source.silver.keys)})
+{delete}SEQUENCE BY {source.silver.sequence_by}
+STORED AS SCD TYPE {source.silver.scd};
 """

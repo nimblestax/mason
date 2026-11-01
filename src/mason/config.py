@@ -83,6 +83,32 @@ def missing_sql(file: str, sql: str) -> Diagnostic:
     )
 
 
+def silver_problems(file: str, silver: dict) -> list[Diagnostic]:
+    """Fields of a Source's `silver:` block that only make sense together."""
+    if "keys" in silver:
+        return [] if "sequence_by" in silver else [_keys_without_sequence_by(file)]
+    upsert_fields = ("sequence_by", "scd", "delete_when")
+    return [_upsert_field_without_keys(file, name) for name in upsert_fields if name in silver]
+
+
+def _keys_without_sequence_by(file: str) -> Diagnostic:
+    return error(
+        "MSN110",
+        file,
+        "`silver.keys` needs `silver.sequence_by`, to order the changes to each key.",
+        "Add `sequence_by` with the column that orders changes, or remove `keys` to append.",
+    )
+
+
+def _upsert_field_without_keys(file: str, name: str) -> Diagnostic:
+    return error(
+        "MSN111",
+        file,
+        f"`silver.{name}` only applies to an upsert, and this Source has no `silver.keys`.",
+        f"Add `keys` with the columns that identify a row, or remove `{name}` to append.",
+    )
+
+
 def _missing_kind(file: str, expected: str) -> Diagnostic:
     return error(
         "MSN101",
