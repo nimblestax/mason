@@ -201,6 +201,7 @@ def test_generated_code_is_uploaded_even_though_init_gitignores_the_package(proj
 def test_a_deleted_model_leaves_the_package(project: Path):
     mason(project, "compile")
     (project / "domains/sales/models/fct_orders.sql").unlink()
+    (project / "domains/sales/models/fct_orders.yaml").unlink()
 
     mason(project, "compile")
 

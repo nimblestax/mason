@@ -1,0 +1,4 @@
+# yaml-language-server: $schema=../../../.mason/schemas/model.v1.json
+kind: model
+version: 1
+sql: fct_orders.sql

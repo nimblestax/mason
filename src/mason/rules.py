@@ -1,25 +1,9 @@
 """Project rules. `mason validate` runs these with no workspace."""
 
-from dataclasses import asdict, dataclass
-
 from mason import sql
+from mason.diagnostics import Diagnostic
 from mason.names import LogicalName
 from mason.project import Project
-
-
-@dataclass(frozen=True)
-class Diagnostic:
-    rule: str
-    name: str
-    severity: str
-    file: str
-    line: int | None
-    message: str
-    fix: str
-    docs: str
-
-    def as_dict(self) -> dict:
-        return asdict(self)
 
 
 def check(project: Project) -> list[Diagnostic]:

@@ -5,6 +5,31 @@ from pathlib import Path
 
 import yaml
 
+KIND = "source"
+SCHEMAS = {
+    1: {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "Mason Source",
+        "description": "An external dataset landed in bronze and conformed into silver.",
+        "type": "object",
+        "required": ["kind", "version", "path", "format"],
+        "additionalProperties": False,
+        "properties": {
+            "kind": {"const": "source", "description": "The Kind of this file."},
+            "version": {"const": 1, "description": "The schema version of this Kind."},
+            "path": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Where the files land, such as a Unity Catalog Volume path.",
+            },
+            "format": {
+                "enum": ["avro", "binaryFile", "csv", "json", "orc", "parquet", "text", "xml"],
+                "description": "The format of the files at `path`.",
+            },
+        },
+    }
+}
+
 
 @dataclass(frozen=True)
 class Source:
