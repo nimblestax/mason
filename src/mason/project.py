@@ -37,13 +37,21 @@ def load(root: Path) -> Project:
 def _problems(root: Path, folder: Path) -> list[Diagnostic]:
     problems: list[Diagnostic] = []
     for file in sorted(folder.glob("sources/*.yaml")):
-        problems += config.check(root, file, source.KIND)
+        problems += _source_problems(root, file)
     for file in sorted(folder.glob("models/*.yaml")):
         problems += _model_problems(root, file)
     for file in sorted(folder.glob("models/*.sql")):
         if not file.with_suffix(".yaml").exists() and not _is_named_by_a_model(file):
             problems.append(config.sql_without_config(_relative(root, file), file.stem))
     return problems
+
+
+def _source_problems(root: Path, file: Path) -> list[Diagnostic]:
+    problems = config.check(root, file, source.KIND)
+    if problems:
+        return problems
+    silver = yaml.safe_load(file.read_text()).get("silver", {})
+    return config.silver_problems(_relative(root, file), silver)
 
 
 def _model_problems(root: Path, file: Path) -> list[Diagnostic]:

@@ -18,6 +18,8 @@ RULES = {
     "MSN107": "unreadable-config",
     "MSN108": "sql-without-config",
     "MSN109": "missing-sql-file",
+    "MSN110": "keys-without-sequence-by",
+    "MSN111": "upsert-field-without-keys",
     "MSN201": "unresolved-logical-name",
     "MSN901": "usage-error",
     "MSN902": "unknown-environment",
