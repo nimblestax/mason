@@ -6,9 +6,11 @@ from typing import Annotated
 
 import typer
 
-from mason import compiler, output, project, rules, scaffold
+from mason import compiler, config, output, project, rules, scaffold
 from mason import deploy as delivery
 from mason.databricks import DatabricksCli, WorkspaceError
+from mason.diagnostics import Diagnostic
+from mason.kinds import KINDS
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
 
@@ -35,17 +37,40 @@ def init(
 @app.command()
 def validate(root: ProjectOption = Path("."), as_json: JsonOption = False) -> None:
     """Check config and SQL references, with no workspace."""
-    diagnostics = rules.check(project.load(root))
+    try:
+        diagnostics = rules.check(project.load(root))
+    except config.InvalidConfig as error:
+        diagnostics = error.diagnostics
     if as_json:
         found = [diagnostic.as_dict() for diagnostic in diagnostics]
         typer.echo(output.envelope("validate", not diagnostics, {}, found))
     else:
         for diagnostic in diagnostics:
-            typer.echo(f"{diagnostic.rule} {diagnostic.file}: {diagnostic.message}")
-            typer.echo(f"  Fix: {diagnostic.fix}")
+            _print(diagnostic)
         typer.echo("Invalid." if diagnostics else "Valid.")
     if diagnostics:
         raise typer.Exit(1)
+
+
+@app.command()
+def schema(
+    kind: Annotated[str, typer.Argument(help="The Kind to describe.")],
+    as_json: JsonOption = False,
+) -> None:
+    """Print a Kind's fields from the installed Mason. Needs no project."""
+    if kind not in KINDS:
+        problem = config.unknown_kind(kind, "")
+        if as_json:
+            typer.echo(output.envelope("schema", False, {}, [problem.as_dict()]))
+        else:
+            _print(problem)
+        raise typer.Exit(2)
+    version, json_schema = max(KINDS[kind].SCHEMAS.items())
+    if as_json:
+        result = {"kind": kind, "version": version, "json_schema": json_schema}
+        typer.echo(output.envelope("schema", True, result, []))
+    else:
+        typer.echo(output.fields(kind, version, json_schema))
 
 
 @app.command("compile")
@@ -56,7 +81,7 @@ def compile_(
     root: ProjectOption = Path("."),
 ) -> None:
     """Write generated code, or print it for one Environment."""
-    loaded = project.load(root)
+    loaded = _load(root)
     if env:
         typer.echo(compiler.print_for(loaded, env))
     else:
@@ -70,10 +95,25 @@ def deploy(
 ) -> None:
     """Deploy to an Environment and refresh its tables."""
     try:
-        delivery.deploy(project.load(root), env, DatabricksCli())
+        delivery.deploy(_load(root), env, DatabricksCli())
     except delivery.InvalidProject as error:
         typer.echo(str(error), err=True)
         raise typer.Exit(1) from error
     except WorkspaceError as error:
         typer.echo(str(error), err=True)
         raise typer.Exit(2) from error
+
+
+def _load(root: Path) -> project.Project:
+    try:
+        return project.load(root)
+    except config.InvalidConfig as error:
+        for diagnostic in error.diagnostics:
+            _print(diagnostic)
+        raise typer.Exit(1) from error
+
+
+def _print(diagnostic: Diagnostic) -> None:
+    where = f" {diagnostic.file}" if diagnostic.file else ""
+    typer.echo(f"{diagnostic.rule}{where}: {diagnostic.message}")
+    typer.echo(f"  Fix: {diagnostic.fix}")

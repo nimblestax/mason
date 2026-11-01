@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=.mason/schemas/platform.v1.json
 kind: platform
 version: 1
 name: {name}
