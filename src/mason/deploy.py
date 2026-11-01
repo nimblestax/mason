@@ -2,16 +2,18 @@
 
 from mason import bundle, compiler, rules
 from mason.databricks import Workspace
+from mason.diagnostics import Failure
 from mason.project import Project
 
 
-class InvalidProject(Exception):
+class InvalidProject(Failure):
     pass
 
 
 def deploy(project: Project, env: str, workspace: Workspace) -> None:
-    if rules.check(project):
-        raise InvalidProject("The project fails validation. Run `mason validate`.")
+    problems = rules.check(project)
+    if problems:
+        raise InvalidProject(problems)
     package = compiler.write_package(project)
     workspace.deploy_bundle(package, env)
     workspace.run_job(package, env, bundle.REFRESH_JOB)
