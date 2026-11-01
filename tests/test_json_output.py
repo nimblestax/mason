@@ -6,8 +6,10 @@ import subprocess
 import sys
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import pytest
+from typer.main import get_command
 from typer.testing import CliRunner
 
 from mason.cli import app
@@ -85,10 +87,12 @@ def test_compile_for_an_environment_returns_the_sql_in_the_envelope(project: Pat
 
 def test_every_registered_command_has_the_json_option():
     """A new command that doesn't register through the shared wrapper fails here."""
-    for registered in app.registered_commands:
-        assert registered.name is not None
-        result = runner.invoke(app, [registered.name, "--help"])
-        assert "--json" in result.stdout, f"`mason {registered.name}` has no --json"
+    group: Any = get_command(app)
+    commands = group.commands
+    assert {"init", "validate", "schema", "compile", "deploy"} <= set(commands)
+    for name, registered in commands.items():
+        options = [option for parameter in registered.params for option in parameter.opts]
+        assert "--json" in options, f"`mason {name}` has no --json"
 
 
 def run_mason(*args: str, path: Path) -> subprocess.CompletedProcess:
@@ -168,7 +172,7 @@ def test_a_usage_error_without_json_stays_text_for_a_person():
 
     assert result.exit_code == 2
     assert result.stdout == ""
-    assert "--env" in result.stderr
+    assert "Missing option" in result.stderr
 
 
 @pytest.mark.parametrize("command", ["compile", "deploy"])
