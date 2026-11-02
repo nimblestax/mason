@@ -227,7 +227,12 @@ REGISTERED_RULES = {
     "MSN109": "missing-sql-file",
     "MSN110": "keys-without-sequence-by",
     "MSN111": "upsert-field-without-keys",
+    "MSN112": "missing-seed-file",
+    "MSN113": "seed-header-mismatch",
+    "MSN114": "seed-row-mismatch",
+    "MSN115": "unsupported-seed-type",
     "MSN201": "unresolved-logical-name",
+    "MSN202": "duplicate-table",
     "MSN901": "usage-error",
     "MSN902": "unknown-environment",
     "MSN903": "databricks-cli-missing",
@@ -261,6 +266,20 @@ def replacing(file: str, old: str, new: str) -> Callable[[Path], None]:
 
 SOURCE = "domains/sales/sources/orders.yaml"
 MODEL = "domains/sales/models/fct_orders"
+
+
+def seed(column: str, rows: str | None, name: str = "countries") -> Callable[[Path], None]:
+    def declare(project: Path) -> None:
+        folder = project / "domains/sales/seeds"
+        folder.mkdir()
+        config = f"kind: seed\nversion: 1\nfile: {name}.csv\ncolumns:\n  {column}\n"
+        (folder / f"{name}.yaml").write_text(config)
+        if rows is not None:
+            (folder / f"{name}.csv").write_text(rows)
+
+    return declare
+
+
 INVALID_PROJECTS = {
     "MSN101": replacing(SOURCE, "kind: source\n", ""),
     "MSN102": replacing(SOURCE, "kind: source\n", "kind: sauce\n"),
@@ -273,7 +292,12 @@ INVALID_PROJECTS = {
     "MSN109": lambda project: (project / f"{MODEL}.sql").unlink(),
     "MSN110": replacing(SOURCE, "format: json\n", "format: json\nsilver:\n  keys: [order_id]\n"),
     "MSN111": replacing(SOURCE, "format: json\n", "format: json\nsilver:\n  scd: 2\n"),
+    "MSN112": seed("code: STRING", None),
+    "MSN113": seed("code: STRING", "nope\nAU\n"),
+    "MSN114": seed("code: INT", "code\nAU\n"),
+    "MSN115": seed("code: VARCAHR", "code\nAU\n"),
     "MSN201": lambda project: (project / f"{MODEL}.sql").write_text("SELECT * FROM a.b.c"),
+    "MSN202": seed("code: STRING", "code\nAU\n", name="orders"),
 }
 
 

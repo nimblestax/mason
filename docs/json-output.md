@@ -16,7 +16,7 @@ Every `mason` command accepts `--json`. It prints one envelope on stdout and not
       "file": "domains/sales/models/fct_orders.sql",
       "line": null,
       "message": "sales.silver.nope isn't a table in this project.",
-      "fix": "Declare a Source or Gold Model with this name, or correct the Logical Name.",
+      "fix": "Declare a Source, Seed or Gold Model with this name, or correct the Logical Name.",
       "docs": "https://github.com/nimblestax/mason-core/blob/main/docs/json-output.md#rule-ids"
     }
   ]
@@ -68,7 +68,12 @@ Rule IDs are `MSN` plus three digits. An ID never changes meaning, and a retired
 | `MSN109` | `missing-sql-file` | A model names a SQL file that doesn't exist. |
 | `MSN110` | `keys-without-sequence-by` | A Source's `silver` block has `keys` but no `sequence_by`. |
 | `MSN111` | `upsert-field-without-keys` | A Source's `silver` block has `sequence_by`, `scd` or `delete_when` but no `keys`. |
+| `MSN112` | `missing-seed-file` | A Seed's `file` doesn't exist beside it. |
+| `MSN113` | `seed-header-mismatch` | The first line of a Seed's file doesn't name each declared column once. |
+| `MSN114` | `seed-row-mismatch` | A row of a Seed's file has the wrong number of values, or a value that doesn't fit its column's type. |
+| `MSN115` | `unsupported-seed-type` | A Seed's column has a type Mason can't check values against. |
 | `MSN201` | `unresolved-logical-name` | SQL reads a table that isn't in the project. |
+| `MSN202` | `duplicate-table` | A Seed and a Source in one Domain share a name, so they would be one table. |
 | `MSN901` | `usage-error` | The command line is wrong. |
 | `MSN902` | `unknown-environment` | `--env` isn't an Environment in the project. |
 | `MSN903` | `databricks-cli-missing` | `databricks` isn't on the PATH. |

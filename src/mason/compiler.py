@@ -4,7 +4,7 @@ import shutil
 from pathlib import Path
 
 from mason import bundle, names, sql
-from mason.kinds import model, source
+from mason.kinds import model, seed, source
 from mason.names import LogicalName
 from mason.project import Project
 
@@ -21,6 +21,11 @@ def generated_files(project: Project) -> dict[Path, str]:
         silver = names.placeholders(LogicalName(item.domain, silver_layer, item.name))
         path = Path("src") / item.domain / "ingest" / f"{item.name}.sql"
         files[path] = source.generate(item, names.path_placeholder(item), bronze, silver)
+    for item in project.seeds:
+        target = names.placeholders(LogicalName(item.domain, silver_layer, item.name))
+        files[Path("src") / item.domain / "ingest" / f"{item.name}.sql"] = seed.generate(
+            item, target
+        )
     for item in project.models:
         target = names.placeholders(LogicalName(item.domain, gold_layer, item.name))
         path = Path("src") / item.domain / "gold" / f"{item.name}.sql"
