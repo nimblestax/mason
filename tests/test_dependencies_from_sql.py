@@ -443,3 +443,83 @@ def test_a_real_name_of_a_table_not_in_the_project_does_not_suggest_it(
     assert failure["fix"] == (
         "Declare a Source, Seed or Gold Model called finance.silver.nope, or correct the name."
     )
+
+
+FILE_READS = [
+    (
+        "read_files",
+        "SELECT * FROM read_files('/Volumes/prod_sales/bronze/landing/orders', format => 'json')",
+    ),
+    ("READ_FILES", "SELECT * FROM READ_FILES('/Volumes/prod_sales/bronze/landing/orders')"),
+    ("read_files", "SELECT * FROM STREAM read_files('/Volumes/x', format => 'json')"),
+    ("cloud_files", "SELECT * FROM cloud_files('/path', 'json')"),
+    ("read_kafka", "SELECT * FROM read_kafka(bootstrapServers => 'x', subscribe => 'orders')"),
+    ("sales.gold.my_tvf", "SELECT * FROM sales.gold.my_tvf(1)"),
+    ("sales.gold.range", "SELECT * FROM sales.gold.range(10)"),
+    (
+        "parquet.`/Volumes/prod_sales/bronze/landing/orders`",
+        "SELECT * FROM parquet.`/Volumes/prod_sales/bronze/landing/orders`",
+    ),
+    ("JSON.`/tmp/x`", "SELECT * FROM JSON.`/tmp/x`"),
+]
+
+
+@pytest.mark.parametrize(("function", "query"), FILE_READS)
+def test_a_gold_model_cannot_read_files_or_external_data(project: Path, function: str, query: str):
+    assert sql.parse(query).file_reads == [sql.Found(function, 1)]
+    write_model(project, query)
+
+    [failure] = failures(project)
+
+    assert failure["rule"] == "MSN206"
+    assert failure["name"] == "file-read"
+    assert failure["message"] == (
+        f"{function} reads data that isn't a table in this project,"
+        " so Mason can't check it or point it at each Environment."
+    )
+    assert failure["fix"] == (
+        "A Gold Model reads tables. Declare a Source for these files"
+        " and read its silver table by Logical Name."
+    )
+
+
+def test_a_file_read_joined_to_a_good_read_is_the_only_problem(project: Path):
+    query = (
+        "SELECT * FROM sales.silver.orders o\n"
+        "JOIN read_files('/Volumes/x', format => 'json') f ON o.order_id = f.order_id"
+    )
+    write_model(project, query)
+
+    [failure] = failures(project)
+
+    assert failure["rule"] == "MSN206"
+    assert failure["line"] == 2
+    assert sql.reads(query) == {ORDERS}
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "SELECT * FROM range(10)",
+        "SELECT * FROM RANGE(1, 10, 2) AS r",
+        "SELECT * FROM explode(array(1, 2, 3))",
+        "SELECT * FROM explode_outer(array(1))",
+        "SELECT * FROM posexplode(array(1))",
+        "SELECT * FROM posexplode_outer(array(1))",
+        "SELECT * FROM inline(array(struct(1, 'a')))",
+        "SELECT * FROM inline_outer(array(struct(1, 'a')))",
+        "SELECT * FROM stack(2, 1, 'a', 2, 'b')",
+        "SELECT * FROM json_tuple('{\"a\": 1}', 'a')",
+        "SELECT * FROM VALUES (1, 'a'), (2, 'b') AS t(id, code)",
+        "SELECT o.order_id, item\nFROM sales.silver.orders o\n"
+        "LATERAL VIEW explode(o.items) t AS item",
+        "SELECT explode(sequence(DATE'2020-01-01', DATE'2020-12-31', INTERVAL 1 DAY)) AS d",
+    ],
+)
+def test_a_function_that_reads_nothing_is_allowed_and_compiles_unchanged(project: Path, query: str):
+    write_model(project, query)
+
+    assert mason(project, "validate", "--json").exit_code == 0, failures(project)
+    compiled = mason(project, "compile", "--env", "dev")
+    assert compiled.exit_code == 0, compiled.output
+    assert query.replace("sales.silver.orders", "dev_sales.silver.orders") in compiled.stdout

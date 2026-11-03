@@ -19,6 +19,7 @@ def check(project: Project) -> list[Diagnostic]:
         diagnostics += _reads(project, known, file, query)
         diagnostics += [_unqualified(file, name) for name in query.unqualified]
         diagnostics += [_computed(file, computed) for computed in query.computed]
+        diagnostics += [_file_read(file, found) for found in query.file_reads]
     return diagnostics + _seeds_named_like_sources(project)
 
 
@@ -93,6 +94,18 @@ def _real_name_of_no_table(file: str, real: sql.Found, logical: LogicalName) -> 
         " is in this project.",
         f"Declare a Source, Seed or Gold Model called {_dotted(logical)}, or correct the name.",
         real.line,
+    )
+
+
+def _file_read(file: str, found: sql.Found) -> Diagnostic:
+    return error(
+        "MSN206",
+        file,
+        f"{found.text} reads data that isn't a table in this project,"
+        " so Mason can't check it or point it at each Environment.",
+        "A Gold Model reads tables. Declare a Source for these files"
+        " and read its silver table by Logical Name.",
+        found.line,
     )
 
 

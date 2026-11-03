@@ -236,6 +236,7 @@ REGISTERED_RULES = {
     "MSN203": "unparseable-sql",
     "MSN204": "computed-table-name",
     "MSN205": "real-table-name",
+    "MSN206": "file-read",
     "MSN901": "usage-error",
     "MSN902": "unknown-environment",
     "MSN903": "databricks-cli-missing",
@@ -307,6 +308,9 @@ INVALID_PROJECTS = {
     ),
     "MSN205": lambda project: (project / f"{MODEL}.sql").write_text(
         "SELECT * FROM dev_sales.silver.orders"
+    ),
+    "MSN206": lambda project: (project / f"{MODEL}.sql").write_text(
+        "SELECT * FROM read_files('/Volumes/x')"
     ),
 }
 

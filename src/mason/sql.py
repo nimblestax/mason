@@ -13,6 +13,21 @@ from mason.names import LogicalName
 
 DIALECT = "databricks"
 
+# Table-valued functions that read nothing, so a Gold Model may call them. Any other fails closed.
+GENERATORS = {
+    "range",
+    "explode",
+    "explode_outer",
+    "posexplode",
+    "posexplode_outer",
+    "inline",
+    "inline_outer",
+    "stack",
+    "json_tuple",
+}
+# Formats that read files straight from a path, as in parquet.`/Volumes/...`.
+FILE_FORMATS = {"parquet", "json", "csv", "delta", "orc", "avro", "text", "binaryfile"}
+
 
 @dataclass(frozen=True)
 class Found:
@@ -29,6 +44,7 @@ class Query:
     reads: dict[LogicalName, Found] = field(default_factory=dict)  # Each as first written.
     unqualified: list[Found] = field(default_factory=list)
     computed: list[Found] = field(default_factory=list)
+    file_reads: list[Found] = field(default_factory=list)
 
 
 class Unparseable(Exception):
@@ -45,21 +61,49 @@ def parse(sql: str) -> Query:
     tree = _one_statement(sql)
     ctes = _cte_references(tree)
     query = Query()
-    for table in tree.find_all(exp.Table):
+    for node in tree.find_all(exp.Table, exp.Stream):
         # A hint only steers the plan: it can't read a table, and one naming nothing is ignored.
-        if any(table is cte for cte in ctes) or table.find_ancestor(exp.Hint):
+        if any(node is cte for cte in ctes) or node.find_ancestor(exp.Hint):
             continue
+        # `STREAM f(...)` without brackets parses as a Stream around f, so read it as `FROM f(...)`.
+        table = node if isinstance(node, exp.Table) else exp.Table(this=node.this.copy())
         line = table.this.meta.get("line")
         if _is_computed(table):
             query.computed.append(Found(table.this.sql(DIALECT), line))
             continue
-        parts = _stream_parts(table) or table.parts
+        parts = _stream_parts(table)
+        function = None if parts else _function(table)
+        if function:
+            if function.lower() not in GENERATORS:
+                query.file_reads.append(Found(function, line))
+            continue
+        parts = parts or table.parts
         written = Found(".".join(part.name for part in parts), line)
         if len(parts) == 3:
             query.reads.setdefault(LogicalName(*(part.name for part in parts)), written)
+        elif _is_file_path(parts):
+            file_format, path = parts
+            query.file_reads.append(Found(f"{file_format.name}.`{path.name}`", line))
         elif all(isinstance(part, exp.Identifier) for part in parts):
             query.unqualified.append(written)
     return query
+
+
+def _function(table: exp.Table) -> str | None:
+    """The table-valued function a FROM item calls, qualified as written, if it calls one."""
+    function = table.this
+    if not isinstance(function, exp.Func):
+        return None
+    name = function.name if isinstance(function, exp.Anonymous) else function.sql_name()
+    return ".".join([*(part.name for part in table.parts[:-1]), name])
+
+
+def _is_file_path(parts: list[exp.Expression]) -> bool:
+    """`parquet.`/Volumes/...`` reads files from a path, with no table at all."""
+    if len(parts) != 2:
+        return False
+    file_format, path = parts
+    return file_format.name.lower() in FILE_FORMATS and bool(path.args.get("quoted"))
 
 
 def reads(sql: str) -> set[LogicalName]:

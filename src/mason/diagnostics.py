@@ -29,6 +29,7 @@ RULES = {
     "MSN203": "unparseable-sql",
     "MSN204": "computed-table-name",
     "MSN205": "real-table-name",
+    "MSN206": "file-read",
     "MSN901": "usage-error",
     "MSN902": "unknown-environment",
     "MSN903": "databricks-cli-missing",

@@ -77,10 +77,11 @@ Rule IDs are `MSN` plus three digits. An ID never changes meaning, and a retired
 | `MSN203` | `unparseable-sql` | A Gold Model's SQL doesn't parse as one Databricks SQL query. |
 | `MSN204` | `computed-table-name` | SQL builds a table name when it runs, such as `IDENTIFIER(...)`, so Mason can't see what it reads. |
 | `MSN205` | `real-table-name` | SQL reads a real table name, which names one Environment, instead of its Logical Name. |
+| `MSN206` | `file-read` | A Gold Model reads files or external data, such as `read_files(...)` or ``parquet.`/path` ``, instead of a table. |
 | `MSN901` | `usage-error` | The command line is wrong. |
 | `MSN902` | `unknown-environment` | `--env` isn't an Environment in the project. |
 | `MSN903` | `databricks-cli-missing` | `databricks` isn't on the PATH. |
 | `MSN904` | `databricks-command-failed` | A Databricks CLI command failed. |
 | `MSN905` | `unexpected-error` | Mason stopped on something it didn't expect, with a traceback on stderr. |
 
-`mason schema <unknown kind>` reports `MSN102` and exits 2, because the mistake is on the command line. `MSN101` to `MSN115` and `MSN201` to `MSN205` exit 1 when found in a project.
+`mason schema <unknown kind>` reports `MSN102` and exits 2, because the mistake is on the command line. `MSN101` to `MSN115` and `MSN201` to `MSN206` exit 1 when found in a project.
