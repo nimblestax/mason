@@ -233,6 +233,10 @@ REGISTERED_RULES = {
     "MSN115": "unsupported-seed-type",
     "MSN201": "unresolved-logical-name",
     "MSN202": "duplicate-table",
+    "MSN203": "unparseable-sql",
+    "MSN204": "computed-table-name",
+    "MSN205": "real-table-name",
+    "MSN206": "file-read",
     "MSN901": "usage-error",
     "MSN902": "unknown-environment",
     "MSN903": "databricks-cli-missing",
@@ -298,6 +302,16 @@ INVALID_PROJECTS = {
     "MSN115": seed("code: VARCAHR", "code\nAU\n"),
     "MSN201": lambda project: (project / f"{MODEL}.sql").write_text("SELECT * FROM a.b.c"),
     "MSN202": seed("code: STRING", "code\nAU\n", name="orders"),
+    "MSN203": lambda project: (project / f"{MODEL}.sql").write_text("SELECT FROM WHERE"),
+    "MSN204": lambda project: (project / f"{MODEL}.sql").write_text(
+        "SELECT * FROM IDENTIFIER(:table)"
+    ),
+    "MSN205": lambda project: (project / f"{MODEL}.sql").write_text(
+        "SELECT * FROM dev_sales.silver.orders"
+    ),
+    "MSN206": lambda project: (project / f"{MODEL}.sql").write_text(
+        "SELECT * FROM read_files('/Volumes/x')"
+    ),
 }
 
 

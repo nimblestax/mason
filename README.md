@@ -57,7 +57,7 @@ MSN201 domains/sales/models/fct_orders.sql: sales.silver.ordrs isn't a table in 
 ## What works today
 
 - `mason init` creates a working project, with GitHub Actions workflows.
-- `mason validate` checks config and SQL references with no workspace.
+- `mason validate` checks config and SQL references with no workspace. A Model's dependencies come from its SQL, with no list to keep: CTEs, aliases and `STREAM(...)` just work, and anything Mason can't read, such as `IDENTIFIER(...)`, is an error rather than a guess.
 - `mason compile` writes generated code, or prints it for one Environment.
 - `mason deploy` deploys to an Environment and refreshes its tables.
 - `mason schema` prints any Kind's fields.

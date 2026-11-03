@@ -49,8 +49,8 @@ def _pipeline(project: Project, domain: str, group: str) -> dict:
     keys = names.settings(project, next(iter(platform.hosts)))
     return {
         "name": f"{platform.name}_{domain}_{group}",
-        "catalog": f"${{var.catalog_{domain}_{layer}}}",
-        "schema": f"${{var.schema_{domain}_{layer}}}",
+        "catalog": f"${{var.{names.catalog_setting(domain, layer)}}}",
+        "schema": f"${{var.{names.schema_setting(domain, layer)}}}",
         "serverless": True,
         "channel": "CURRENT",
         "libraries": [{"glob": {"include": f"src/{domain}/{group}/**"}}],
