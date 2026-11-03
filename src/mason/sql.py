@@ -46,7 +46,8 @@ def parse(sql: str) -> Query:
     ctes = _cte_references(tree)
     query = Query()
     for table in tree.find_all(exp.Table):
-        if any(table is cte for cte in ctes):
+        # A hint only steers the plan: it can't read a table, and one naming nothing is ignored.
+        if any(table is cte for cte in ctes) or table.find_ancestor(exp.Hint):
             continue
         line = table.this.meta.get("line")
         if _is_computed(table):
@@ -128,22 +129,32 @@ def _stream_parts(table: exp.Table) -> list[exp.Expression]:
 
 def rewrite(sql: str, replacement: Callable[[LogicalName], str]) -> str:
     """Replaces each three-part name in place, so comments and layout survive."""
-    tokens = sqlglot.tokenize(sql, dialect=DIALECT)
     known = reads(sql)
     pieces: list[str] = []
     position = 0
-    for first, second, third in _three_part_names(tokens):
-        name = LogicalName(first.text, second.text, third.text)
+    for start, end, name in _three_part_names(sql):
         if name in known:
-            pieces += [sql[position : first.start], replacement(name)]
-            position = third.end + 1
+            pieces += [sql[position:start], replacement(name)]
+            position = end
     return "".join(pieces) + sql[position:]
 
 
-def _three_part_names(tokens: list[Token]) -> list[tuple[Token, Token, Token]]:
+def _three_part_names(sql: str, offset: int = 0) -> list[tuple[int, int, LogicalName]]:
+    """Each `a.b.c`, with where it starts and ends. Comments and strings aren't names."""
+    tokens = sqlglot.tokenize(sql, dialect=DIALECT)
     found = []
-    for index in range(len(tokens) - 4):
-        first, dot_one, second, dot_two, third = tokens[index : index + 5]
-        if dot_one.token_type == TokenType.DOT and dot_two.token_type == TokenType.DOT:
-            found.append((first, second, third))
+    for index, token in enumerate(tokens):
+        if token.token_type == TokenType.HINT:
+            # A whole `/*+ ... */` is one token, so the names inside it are found in its body.
+            body = token.start + len("/*+")
+            found += _three_part_names(sql[body : token.end - 1], offset + body)
+        window = tokens[index : index + 5]
+        if len(window) == 5 and _is_three_part(window):
+            first, _, second, _, third = window
+            name = LogicalName(first.text, second.text, third.text)
+            found.append((offset + first.start, offset + third.end + 1, name))
     return found
+
+
+def _is_three_part(window: list[Token]) -> bool:
+    return window[1].token_type == TokenType.DOT and window[3].token_type == TokenType.DOT

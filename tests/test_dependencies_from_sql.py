@@ -190,3 +190,74 @@ def test_every_kind_of_query_validates(project: Path, query: str):
     result = mason(project, "validate", "--json")
 
     assert result.exit_code == 0, result.output
+
+
+JOINED = "FROM sales.silver.orders o\nJOIN sales.bronze.orders c USING (order_id)"
+
+
+@pytest.mark.parametrize(
+    "hint",
+    [
+        "/*+ BROADCAST(c) */",
+        "/*+ MERGE(o, c) */",
+        "/*+ SHUFFLE_HASH(c) */",
+        "/*+ BROADCASTJOIN(c) */",
+        "/*+ MAPJOIN(c) */",
+        "/*+ BROADCAST(nope) */",
+        "/*+ REPARTITION(4) */",
+        "/*+ COALESCE(1) */",
+    ],
+)
+def test_a_hint_is_never_a_read_and_compiles_unchanged(project: Path, hint: str):
+    query = f"SELECT {hint} o.order_id\n{JOINED}"
+    write_model(project, query)
+
+    assert sql.reads(query) == {ORDERS, LogicalName("sales", "bronze", "orders")}
+    assert mason(project, "validate", "--json").exit_code == 0
+    compiled = mason(project, "compile", "--env", "dev")
+    assert compiled.exit_code == 0, compiled.output
+    assert hint in compiled.stdout
+
+
+def test_a_hint_naming_a_cte_validates(project: Path):
+    write_model(
+        project,
+        "WITH recent AS (SELECT * FROM sales.silver.orders)\n"
+        "SELECT /*+ BROADCAST(recent) */ * FROM sales.bronze.orders JOIN recent USING (order_id)",
+    )
+
+    assert mason(project, "validate", "--json").exit_code == 0
+
+
+def test_a_logical_name_in_a_hint_compiles_like_the_join_it_names(project: Path):
+    write_model(
+        project,
+        "SELECT /*+ BROADCAST(sales.bronze.orders) */ o.order_id -- sales.bronze.orders\n"
+        "FROM sales.silver.orders o JOIN sales.bronze.orders USING (order_id)\n"
+        "WHERE o.note <> 'sales.bronze.orders'",
+    )
+
+    result = mason(project, "compile", "--env", "dev")
+
+    assert result.exit_code == 0, result.output
+    assert "/*+ BROADCAST(dev_sales.bronze.orders) */" in result.stdout
+    assert "JOIN dev_sales.bronze.orders USING" in result.stdout
+    assert "-- sales.bronze.orders" in result.stdout
+    assert "'sales.bronze.orders'" in result.stdout
+
+
+def test_a_hint_does_not_hide_a_bad_read(project: Path):
+    write_model(project, "SELECT /*+ BROADCAST(o) */ *\nFROM sales.silver.ordrs o")
+
+    [failure] = failures(project)
+
+    assert failure["rule"] == "MSN201"
+    assert "sales.silver.ordrs" in failure["message"]
+
+
+def test_broken_hint_syntax_is_ignored_like_any_hint(project: Path):
+    write_model(project, f"SELECT /*+ BROADCAST(c */ o.order_id\n{JOINED}")
+
+    result = mason(project, "validate", "--json")
+
+    assert result.exit_code == 0, result.output
