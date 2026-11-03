@@ -138,3 +138,55 @@ def test_a_real_table_name_fails_with_a_fix_naming_its_logical_name(project: Pat
     assert failure["line"] == 2
     assert "prod_sales.silver.orders" in failure["message"]
     assert "sales.silver.orders" in failure["fix"]
+
+
+NOT_QUERIES = [
+    ("DROP", "DROP TABLE sales.silver.orders"),
+    ("INSERT", "INSERT INTO sales.gold.dim_date SELECT * FROM sales.silver.orders"),
+    ("DELETE", "DELETE FROM sales.silver.orders WHERE amount < 0"),
+    ("UPDATE", "UPDATE sales.silver.orders SET amount = 0"),
+    (
+        "MERGE",
+        "MERGE INTO sales.silver.orders AS t USING sales.bronze.orders AS s"
+        " ON t.order_id = s.order_id WHEN MATCHED THEN DELETE",
+    ),
+    ("CREATE", "CREATE TABLE sales.gold.copy AS SELECT * FROM sales.silver.orders"),
+    ("CREATE", "CREATE VIEW sales.gold.copy AS SELECT * FROM sales.silver.orders"),
+    ("USE", "USE CATALOG prod_sales"),
+]
+
+
+@pytest.mark.parametrize(("statement", "query"), NOT_QUERIES)
+def test_a_statement_that_is_not_a_query_cannot_be_parsed_as_reads(statement: str, query: str):
+    with pytest.raises(sql.Unparseable, match=f"It's a {statement} statement, not a query."):
+        sql.parse(query)
+
+
+@pytest.mark.parametrize("query", [query for _, query in NOT_QUERIES])
+def test_a_statement_that_is_not_a_query_fails_with_only_msn203(project: Path, query: str):
+    write_model(project, query)
+
+    [failure] = failures(project)
+
+    assert failure["rule"] == "MSN203"
+    assert failure["fix"] == "Make the file one Databricks SQL query that runs on its own."
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "SELECT * FROM sales.silver.orders",
+        "WITH o AS (SELECT * FROM sales.silver.orders) SELECT * FROM o",
+        "SELECT order_id FROM sales.silver.orders\n"
+        "UNION ALL SELECT order_id FROM sales.bronze.orders",
+        "(SELECT 1 AS a UNION SELECT 2) EXCEPT SELECT 3",
+        "VALUES (1, 'a'), (2, 'b')",
+        "SELECT * FROM sales.silver.orders;",
+    ],
+)
+def test_every_kind_of_query_validates(project: Path, query: str):
+    write_model(project, query)
+
+    result = mason(project, "validate", "--json")
+
+    assert result.exit_code == 0, result.output

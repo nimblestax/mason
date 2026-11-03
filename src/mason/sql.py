@@ -77,7 +77,20 @@ def _one_statement(sql: str) -> exp.Expression:
         raise Unparseable(str(failure)) from failure
     if len(statements) != 1:
         raise Unparseable(f"It holds {len(statements)} statements, not one query.")
-    return statements[0]
+    [statement] = statements
+    # A top-level VALUES is a query too, but sqlglot doesn't class it as one.
+    if not isinstance(statement, exp.Query | exp.Values):
+        raise Unparseable(f"It's a {_keyword(statement)} statement, not a query.")
+    return statement
+
+
+def _keyword(statement: exp.Expression) -> str:
+    """The word a statement starts with, such as DROP or INSERT."""
+    if isinstance(statement, exp.Command):
+        return statement.name.upper()
+    if isinstance(statement, exp.TruncateTable):
+        return "TRUNCATE"
+    return statement.key.upper()
 
 
 def _cte_references(tree: exp.Expression) -> list[exp.Table]:
