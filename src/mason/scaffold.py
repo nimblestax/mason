@@ -7,7 +7,7 @@ from importlib.resources import files
 from importlib.resources.abc import Traversable
 from pathlib import Path
 
-from mason.kinds import KINDS
+from mason.kinds import KINDS, json_schemas
 
 PLACEHOLDER_HOST = "https://your-workspace.cloud.databricks.com"
 SCHEMA_FOLDER = Path(".mason/schemas")
@@ -25,8 +25,8 @@ def _write_schemas(root: Path) -> None:
     """A copy in the project, so editors check config offline and before any release."""
     folder = root / SCHEMA_FOLDER
     folder.mkdir(parents=True, exist_ok=True)
-    for kind, module in KINDS.items():
-        for number, schema in module.SCHEMAS.items():
+    for kind in KINDS:
+        for number, schema in json_schemas(kind).items():
             (folder / f"{kind}.v{number}.json").write_text(json.dumps(schema, indent=2) + "\n")
 
 

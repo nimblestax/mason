@@ -5,9 +5,10 @@ from typing import Any
 
 import yaml
 from jsonschema import Draft202012Validator
+from pydantic import BaseModel, ValidationError
 
 from mason.diagnostics import Diagnostic, Failure, error
-from mason.kinds import KINDS
+from mason.kinds import KINDS, json_schemas, platform, versions
 
 
 class InvalidConfig(Failure):
@@ -16,6 +17,22 @@ class InvalidConfig(Failure):
 
 def check(root: Path, file: Path, expected: str) -> list[Diagnostic]:
     """Problems with one file that should be of the `expected` Kind."""
+    result = _read(root, file, expected)
+    return result if isinstance(result, list) else []
+
+
+def load[M: BaseModel](root: Path, file: Path, expected: str, latest: type[M]) -> M:
+    """A file of the `expected` Kind, checked against its own version and upgraded to `latest`."""
+    result = _read(root, file, expected)
+    if isinstance(result, list):
+        raise InvalidConfig(result)
+    if not isinstance(result, latest):
+        raise TypeError(f"`{expected}` upgrades to {type(result).__name__}, not {latest.__name__}.")
+    return result
+
+
+def _read(root: Path, file: Path, expected: str) -> list[Diagnostic] | BaseModel | dict:
+    """The file's problems, or its content: a model at the latest version once a Kind has one."""
     relative = file.relative_to(root).as_posix()
     try:
         content = yaml.safe_load(file.read_text())
@@ -32,12 +49,39 @@ def check(root: Path, file: Path, expected: str) -> list[Diagnostic]:
         return [_wrong_kind(relative, kind, expected)]
     if "version" not in content:
         return [_missing_version(relative, kind)]
-    return _check_version_and_fields(relative, kind, content)
+    # Only the Platform Contract has moved to Pydantic so far; the other Kinds follow.
+    if kind == platform.KIND:
+        return _validate(relative, kind, content)
+    return _check_version_and_fields(relative, kind, content) or content
+
+
+def _validate(relative: str, kind: str, content: dict) -> list[Diagnostic] | BaseModel:
+    """Checks the file with its own version's model, then upgrades it to the latest version."""
+    module = platform
+    version = _version_number(content["version"])
+    if version not in module.VERSIONS:
+        return [_unknown_version(relative, kind, content["version"], sorted(module.VERSIONS))]
+    try:
+        document = module.VERSIONS[version].model_validate(content)
+    except ValidationError as problems:
+        return [_invalid_model_field(relative, kind, item) for item in problems.errors()]
+    for step in range(version, max(module.VERSIONS)):
+        document = module.UPGRADES[step](document)
+    return document
+
+
+def _version_number(version: object) -> int | None:
+    """Which version's model to check against. That model still rejects `"1"` or `true`."""
+    if isinstance(version, int):
+        return int(version)
+    if isinstance(version, str) and version.isdigit():
+        return int(version)
+    return None
 
 
 def _check_version_and_fields(relative: str, kind: str, content: dict) -> list[Diagnostic]:
     version: Any = content["version"]
-    schemas = KINDS[kind].SCHEMAS
+    schemas = json_schemas(kind)
     # `type` rather than isinstance, because YAML's `true` is an int to Python.
     if type(version) is not int or version not in schemas:
         return [_unknown_version(relative, kind, version, sorted(schemas))]
@@ -119,7 +163,7 @@ def _missing_kind(file: str, expected: str) -> Diagnostic:
 
 
 def _missing_version(file: str, kind: str) -> Diagnostic:
-    latest = max(KINDS[kind].SCHEMAS)
+    latest = max(versions(kind))
     return error(
         "MSN103",
         file,
@@ -147,12 +191,20 @@ def _wrong_kind(file: str, kind: str, expected: str) -> Diagnostic:
 
 
 def _invalid_field(file: str, kind: str, problem: Any) -> Diagnostic:
-    field = ".".join(map(str, problem.absolute_path))
+    return _msn106(file, kind, problem.absolute_path, problem.message)
+
+
+def _invalid_model_field(file: str, kind: str, problem: Any) -> Diagnostic:
+    return _msn106(file, kind, problem["loc"], problem["msg"])
+
+
+def _msn106(file: str, kind: str, path: Any, message: str) -> Diagnostic:
+    field = ".".join(map(str, path))
     prefix = f"{field}: " if field else ""
     return error(
         "MSN106",
         file,
-        f"{prefix}{problem.message}",
+        f"{prefix}{message}",
         f"Run `mason schema {kind}` to see the fields of this Kind.",
     )
 

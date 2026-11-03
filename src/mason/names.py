@@ -50,8 +50,8 @@ def settings(project: Project, env: str) -> dict[str, str]:
     for domain in platform.domains:
         for layer in (*platform.source_layers, *platform.model_layers):
             parts = {"env": env, "domain": domain, "layer": layer}
-            values[catalog_setting(domain, layer)] = platform.catalog_pattern.format(**parts)
-            values[schema_setting(domain, layer)] = platform.schema_pattern.format(**parts)
+            values[catalog_setting(domain, layer)] = platform.naming.catalog_pattern.format(**parts)
+            values[schema_setting(domain, layer)] = platform.naming.schema_pattern.format(**parts)
     for source in project.sources:
         values[_path_setting(source)] = source.path_in(env)
     return values
