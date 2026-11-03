@@ -29,8 +29,10 @@ def _reads(project: Project, known: set[LogicalName], file: str, query: sql.Quer
         if read in known:
             continue
         logical = names.logical_name_for(project, read)
-        if logical:
+        if logical in known:
             diagnostics.append(_real_name(file, written, logical))
+        elif logical:
+            diagnostics.append(_real_name_of_no_table(file, written, logical))
         else:
             diagnostics.append(_unresolved(file, written))
     return diagnostics
@@ -79,6 +81,17 @@ def _real_name(file: str, real: sql.Found, logical: LogicalName) -> Diagnostic:
         file,
         f"{real.text} is a real table name, which names one Environment.",
         f"Use its Logical Name, {_dotted(logical)}, so the same SQL works in every Environment.",
+        real.line,
+    )
+
+
+def _real_name_of_no_table(file: str, real: sql.Found, logical: LogicalName) -> Diagnostic:
+    return error(
+        "MSN205",
+        file,
+        f"{real.text} is a real table name, and no table called {_dotted(logical)}"
+        " is in this project.",
+        f"Declare a Source, Seed or Gold Model called {_dotted(logical)}, or correct the name.",
         real.line,
     )
 

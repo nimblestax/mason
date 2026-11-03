@@ -364,3 +364,82 @@ def test_one_table_in_two_cases_is_one_read_and_one_typo_is_reported_once(projec
     write_model(project, "SELECT * FROM sales.silver.ordrs JOIN Sales.Silver.ORDRS USING (id)")
     [failure] = failures(project)
     assert failure["rule"] == "MSN201"
+
+
+NAMING_STYLES = {
+    "layer-catalogs": (
+        '"{env}_{layer}"',
+        '"{domain}"',
+        "{env}_silver.finance",
+        "{env}_gold.finance",
+    ),
+    "environment-catalogs": (
+        '"{env}"',
+        '"{domain}_{layer}"',
+        "{env}.finance_silver",
+        "{env}.finance_gold",
+    ),
+}
+
+
+@pytest.fixture(params=NAMING_STYLES, ids=list(NAMING_STYLES))
+def finance(project: Path, request) -> tuple[Path, str, str]:
+    """A `finance` Domain holding the Source `invoices` and the Model `fct_invoices`."""
+    catalog, schema, silver, gold = NAMING_STYLES[request.param]
+    add_environment(project, "prod")
+    platform = project / "mason.platform.yaml"
+    text = platform.read_text()
+    text = text.replace('catalog: "{env}_{domain}"', f"catalog: {catalog}")
+    text = text.replace('schema: "{layer}"', f"schema: {schema}")
+    platform.write_text(text.replace("  - sales\n", "  - sales\n  - finance\n"))
+    folder = project / "domains/finance"
+    (folder / "sources").mkdir(parents=True)
+    (folder / "sources/invoices.yaml").write_text(
+        "kind: source\nversion: 1\npath: /Volumes/{env}/landing/invoices\nformat: json\n"
+    )
+    (folder / "models").mkdir()
+    (folder / "models/fct_invoices.yaml").write_text(
+        "kind: model\nversion: 1\nsql: fct_invoices.sql\n"
+    )
+    (folder / "models/fct_invoices.sql").write_text("SELECT * FROM finance.silver.invoices")
+    return project, silver, gold
+
+
+@pytest.mark.parametrize("env", ["dev", "prod"])
+@pytest.mark.parametrize(
+    ("layer", "entity", "logical"),
+    [
+        ("silver", "invoices", "finance.silver.invoices"),
+        ("gold", "fct_invoices", "finance.gold.fct_invoices"),
+    ],
+)
+def test_a_real_name_of_a_table_in_the_project_points_to_its_logical_name(
+    finance: tuple[Path, str, str], env: str, layer: str, entity: str, logical: str
+):
+    project, silver, gold = finance
+    real = f"{(silver if layer == 'silver' else gold).format(env=env)}.{entity}"
+    write_model(project, f"SELECT * FROM {real}")
+
+    [failure] = failures(project)
+
+    assert failure["rule"] == "MSN205"
+    assert f"Use its Logical Name, {logical}," in failure["fix"]
+
+
+@pytest.mark.parametrize("env", ["dev", "prod"])
+def test_a_real_name_of_a_table_not_in_the_project_does_not_suggest_it(
+    finance: tuple[Path, str, str], env: str
+):
+    project, silver, _ = finance
+    real = f"{silver.format(env=env)}.nope"
+    write_model(project, f"SELECT * FROM {real}")
+
+    [failure] = failures(project)
+
+    assert failure["rule"] == "MSN205"
+    assert failure["message"] == (
+        f"{real} is a real table name, and no table called finance.silver.nope is in this project."
+    )
+    assert failure["fix"] == (
+        "Declare a Source, Seed or Gold Model called finance.silver.nope, or correct the name."
+    )
