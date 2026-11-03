@@ -41,6 +41,20 @@ def settings(project: Project, env: str) -> dict[str, str]:
     return values
 
 
+def logical_name_for(project: Project, real: LogicalName) -> LogicalName | None:
+    """The Logical Name behind a real table name in any Environment, if it is one."""
+    platform = project.platform
+    for env in platform.hosts:
+        values = settings(project, env)
+        for domain in platform.domains:
+            for layer in (*platform.source_layers, *platform.model_layers):
+                catalog = values[f"catalog_{domain}_{layer}"]
+                schema = values[f"schema_{domain}_{layer}"]
+                if (real.domain, real.layer) == (catalog, schema):
+                    return LogicalName(domain, layer, real.entity)
+    return None
+
+
 def resolve(generated: str, project: Project, env: str) -> str:
     """Generated code with its placeholders replaced by one Environment's real names."""
     values = settings(project, env)
