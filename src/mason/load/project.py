@@ -5,13 +5,13 @@ from pathlib import Path
 
 import yaml
 
-from mason import config
 from mason.diagnostics import Diagnostic
 from mason.kinds import model, platform, seed, source
 from mason.kinds.model import Model
 from mason.kinds.platform import Platform
 from mason.kinds.seed import Seed
 from mason.kinds.source import Source
+from mason.load import config
 
 
 @dataclass(frozen=True)

@@ -1,9 +1,10 @@
 """`mason deploy`: ships one Environment and refreshes it."""
 
-from mason import bundle, compiler, rules
-from mason.databricks import Workspace
+from mason.build import bundle, compiler
+from mason.check import rules
+from mason.deploy.databricks import Workspace
 from mason.diagnostics import Failure
-from mason.project import Project
+from mason.load.project import Project
 
 
 class InvalidProject(Failure):

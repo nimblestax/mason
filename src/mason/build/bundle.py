@@ -3,7 +3,7 @@
 import yaml
 
 from mason import names
-from mason.project import Project
+from mason.load.project import Project
 
 REFRESH_JOB = "refresh"
 
