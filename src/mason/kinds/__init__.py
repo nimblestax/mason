@@ -6,13 +6,14 @@ from mason.kinds import model, platform, seed, source
 
 KINDS = {module.KIND: module for module in (source, seed, model, platform)}
 
+# The Kinds whose files live in a Domain's folder, in the order they're loaded.
+IN_DOMAINS = (source, seed, model)
+
 
 def json_schemas(kind: str) -> dict[int, dict[str, Any]]:
-    """The JSON Schema of each version of a Kind, generated from its models where it has them."""
-    if kind == platform.KIND:
-        return {n: version.model_json_schema() for n, version in platform.VERSIONS.items()}
-    return {source.KIND: source, seed.KIND: seed, model.KIND: model}[kind].SCHEMAS
+    """The JSON Schema of each version of a Kind, generated from its models."""
+    return {n: version.model_json_schema() for n, version in KINDS[kind].VERSIONS.items()}
 
 
 def versions(kind: str) -> list[int]:
-    return sorted(json_schemas(kind))
+    return sorted(KINDS[kind].VERSIONS)

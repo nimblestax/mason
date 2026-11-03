@@ -1,0 +1,4 @@
+code,name,vat_rate,joined,active
+AU,Australia,0.10,2001-01-01,true
+NZ,"Aotearoa, New Zealand",0.15,,false
+GB,O'Brien's ${land},,2020-02-29,

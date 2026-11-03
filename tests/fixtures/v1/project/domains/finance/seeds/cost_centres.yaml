@@ -1,0 +1,6 @@
+kind: seed
+version: 1
+file: cost_centres.csv
+columns:
+  id: INT
+  label: STRING

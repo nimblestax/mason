@@ -1,0 +1,9 @@
+kind: source
+version: 1
+path: /Volumes/{env}_sales/bronze/landing/orders
+format: json
+silver:
+  keys: [region, order_id]
+  sequence_by: updated_at
+  delete_when: operation = 'DELETE'
+  scd: 2

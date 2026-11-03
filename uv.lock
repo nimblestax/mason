@@ -168,7 +168,6 @@ name = "mason-databricks"
 version = "0.0.1"
 source = { editable = "." }
 dependencies = [
-    { name = "jsonschema" },
     { name = "pydantic" },
     { name = "pyyaml" },
     { name = "sqlglot" },
@@ -178,6 +177,7 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "black" },
+    { name = "jsonschema" },
     { name = "pre-commit" },
     { name = "pytest" },
     { name = "ruff" },
@@ -186,7 +186,6 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "jsonschema", specifier = ">=4" },
     { name = "pydantic", specifier = ">=2.14.2" },
     { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "sqlglot", specifier = "==26.*" },
@@ -196,6 +195,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "black", specifier = ">=26.10.1" },
+    { name = "jsonschema", specifier = ">=4.26.0" },
     { name = "pre-commit", specifier = ">=4.7.0" },
     { name = "pytest", specifier = ">=9.2.0" },
     { name = "ruff", specifier = ">=0.17.3" },

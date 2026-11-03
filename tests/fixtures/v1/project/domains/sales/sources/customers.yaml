@@ -1,0 +1,4 @@
+kind: source
+version: 1
+path: /Volumes/{env}_sales/bronze/landing/customers/*.csv
+format: csv
