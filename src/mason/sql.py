@@ -26,7 +26,7 @@ class Found:
 class Query:
     """What a Gold Model's SQL reads, and what in it can't be read as a Logical Name."""
 
-    reads: dict[LogicalName, int | None] = field(default_factory=dict)
+    reads: dict[LogicalName, Found] = field(default_factory=dict)  # Each as first written.
     unqualified: list[Found] = field(default_factory=list)
     computed: list[Found] = field(default_factory=list)
 
@@ -54,10 +54,11 @@ def parse(sql: str) -> Query:
             query.computed.append(Found(table.this.sql(DIALECT), line))
             continue
         parts = _stream_parts(table) or table.parts
+        written = Found(".".join(part.name for part in parts), line)
         if len(parts) == 3:
-            query.reads.setdefault(LogicalName(*(part.name for part in parts)), line)
+            query.reads.setdefault(LogicalName(*(part.name for part in parts)), written)
         elif all(isinstance(part, exp.Identifier) for part in parts):
-            query.unqualified.append(Found(".".join(part.name for part in parts), line))
+            query.unqualified.append(written)
     return query
 
 
@@ -95,7 +96,7 @@ def _keyword(statement: exp.Expression) -> str:
 
 
 def _cte_references(tree: exp.Expression) -> list[exp.Table]:
-    """Tables that name a CTE visible where they appear. A CTE's own body can't see it."""
+    """Tables that name a CTE visible where they appear, in any case. A CTE's body can't see it."""
     try:
         scopes = traverse_scope(tree)
     except SqlglotError as failure:
@@ -104,7 +105,8 @@ def _cte_references(tree: exp.Expression) -> list[exp.Table]:
         table
         for scope in scopes
         for table in scope.tables
-        if len(table.parts) == 1 and table.name in scope.cte_sources
+        if len(table.parts) == 1
+        and table.name.lower() in {name.lower() for name in scope.cte_sources}
     ]
 
 

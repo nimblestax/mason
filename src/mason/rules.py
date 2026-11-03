@@ -25,14 +25,14 @@ def check(project: Project) -> list[Diagnostic]:
 def _reads(project: Project, known: set[LogicalName], file: str, query: sql.Query):
     """Every read must be a table in the project. A real table name gets its Logical Name."""
     diagnostics = []
-    for read, line in sorted(query.reads.items(), key=lambda item: str(item[0])):
+    for read, written in sorted(query.reads.items(), key=lambda item: str(item[0])):
         if read in known:
             continue
         logical = names.logical_name_for(project, read)
         if logical:
-            diagnostics.append(_real_name(file, read, logical, line))
+            diagnostics.append(_real_name(file, written, logical))
         else:
-            diagnostics.append(_unresolved(file, read, line))
+            diagnostics.append(_unresolved(file, written))
     return diagnostics
 
 
@@ -63,23 +63,23 @@ def _seeds_named_like_sources(project: Project) -> list[Diagnostic]:
     ]
 
 
-def _unresolved(file: str, read: LogicalName, line: int | None) -> Diagnostic:
+def _unresolved(file: str, read: sql.Found) -> Diagnostic:
     return error(
         "MSN201",
         file,
-        f"{_dotted(read)} isn't a table in this project.",
+        f"{read.text} isn't a table in this project.",
         "Declare a Source, Seed or Gold Model with this name, or correct the Logical Name.",
-        line,
+        read.line,
     )
 
 
-def _real_name(file: str, real: LogicalName, logical: LogicalName, line: int | None):
+def _real_name(file: str, real: sql.Found, logical: LogicalName) -> Diagnostic:
     return error(
         "MSN205",
         file,
-        f"{_dotted(real)} is a real table name, which names one Environment.",
+        f"{real.text} is a real table name, which names one Environment.",
         f"Use its Logical Name, {_dotted(logical)}, so the same SQL works in every Environment.",
-        line,
+        real.line,
     )
 
 

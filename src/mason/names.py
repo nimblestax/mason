@@ -11,15 +11,31 @@ PLACEHOLDER = re.compile(r"\$\{(\w+)\}")
 
 @dataclass(frozen=True)
 class LogicalName:
+    """Always lowercase, because Databricks matches names whatever their case."""
+
     domain: str
     layer: str
     entity: str
 
+    def __post_init__(self) -> None:
+        for part in ("domain", "layer", "entity"):
+            object.__setattr__(self, part, getattr(self, part).lower())
+
 
 def placeholders(name: LogicalName) -> str:
     """The table as generated code refers to it, the same in every Environment."""
-    suffix = f"{name.domain}_{name.layer}"
-    return f"${{catalog_{suffix}}}.${{schema_{suffix}}}.{name.entity}"
+    catalog = catalog_setting(name.domain, name.layer)
+    schema = schema_setting(name.domain, name.layer)
+    return f"${{{catalog}}}.${{{schema}}}.{name.entity}"
+
+
+def catalog_setting(domain: str, layer: str) -> str:
+    """The placeholder for a Domain and Layer's catalog, keyed in lowercase like Logical Names."""
+    return f"catalog_{domain}_{layer}".lower()
+
+
+def schema_setting(domain: str, layer: str) -> str:
+    return f"schema_{domain}_{layer}".lower()
 
 
 def path_placeholder(source: Source) -> str:
@@ -34,8 +50,8 @@ def settings(project: Project, env: str) -> dict[str, str]:
     for domain in platform.domains:
         for layer in (*platform.source_layers, *platform.model_layers):
             parts = {"env": env, "domain": domain, "layer": layer}
-            values[f"catalog_{domain}_{layer}"] = platform.catalog_pattern.format(**parts)
-            values[f"schema_{domain}_{layer}"] = platform.schema_pattern.format(**parts)
+            values[catalog_setting(domain, layer)] = platform.catalog_pattern.format(**parts)
+            values[schema_setting(domain, layer)] = platform.schema_pattern.format(**parts)
     for source in project.sources:
         values[_path_setting(source)] = source.path_in(env)
     return values
@@ -48,8 +64,8 @@ def logical_name_for(project: Project, real: LogicalName) -> LogicalName | None:
         values = settings(project, env)
         for domain in platform.domains:
             for layer in (*platform.source_layers, *platform.model_layers):
-                catalog = values[f"catalog_{domain}_{layer}"]
-                schema = values[f"schema_{domain}_{layer}"]
+                catalog = values[catalog_setting(domain, layer)].lower()
+                schema = values[schema_setting(domain, layer)].lower()
                 if (real.domain, real.layer) == (catalog, schema):
                     return LogicalName(domain, layer, real.entity)
     return None

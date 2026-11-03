@@ -1,9 +1,11 @@
 """A Gold Model's reads come only from its SQL, and anything Mason can't read is an error."""
 
 import json
+import re
 from pathlib import Path
 
 import pytest
+import yaml
 from typer.testing import CliRunner
 
 from mason import sql
@@ -261,3 +263,104 @@ def test_broken_hint_syntax_is_ignored_like_any_hint(project: Path):
     result = mason(project, "validate", "--json")
 
     assert result.exit_code == 0, result.output
+
+
+def add_environment(project: Path, env: str) -> None:
+    platform = project / "mason.platform.yaml"
+    platform.write_text(
+        platform.read_text().replace(
+            "environments:\n", f"environments:\n  {env}:\n    host: https://{env}.example.com\n"
+        )
+    )
+
+
+def compiles_in_every_environment(project: Path) -> list[str]:
+    outputs = []
+    for env in ("dev", "prod"):
+        result = mason(project, "compile", "--env", env)
+        assert result.exit_code == 0, result.output
+        outputs.append(result.stdout)
+    assert mason(project, "compile").exit_code == 0
+    return outputs
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "SELECT * FROM Sales.Silver.Orders",
+        "SELECT * FROM sales.silver.Orders",
+        "SELECT * FROM STREAM(Sales.Silver.Orders)",
+        "WITH Paid AS (SELECT * FROM sales.silver.orders) SELECT * FROM paid",
+    ],
+)
+def test_names_match_whatever_their_case(project: Path, query: str):
+    add_environment(project, "prod")
+    write_model(project, query)
+
+    assert sql.reads(query) == {ORDERS}
+    assert mason(project, "validate", "--json").exit_code == 0
+    dev, prod = compiles_in_every_environment(project)
+    assert "dev_sales.silver.orders" in dev
+    assert "prod_sales.silver.orders" in prod
+
+
+def test_a_source_file_with_capitals_is_read_in_lowercase(project: Path):
+    add_environment(project, "prod")
+    sources = project / "domains/sales/sources"
+    (sources / "orders.yaml").rename(sources / "Orders.yaml")
+
+    assert mason(project, "validate", "--json").exit_code == 0, failures(project)
+    compiles_in_every_environment(project)
+
+
+def test_a_domain_with_capitals_is_read_in_lowercase(project: Path):
+    add_environment(project, "prod")
+    platform = project / "mason.platform.yaml"
+    platform.write_text(platform.read_text().replace("  - sales\n", "  - Sales\n"))
+    (project / "domains/sales").rename(project / "domains/Sales")
+
+    assert mason(project, "validate", "--json").exit_code == 0, failures(project)
+    dev, prod = compiles_in_every_environment(project)
+    assert "dev_Sales.silver.orders" in dev
+    assert "prod_Sales.silver.orders" in prod
+    bundle = (project / "build/databricks.yml").read_text()
+    declared = set(yaml.safe_load(bundle)["variables"])
+    assert set(re.findall(r"\$\{var\.(\w+)\}", bundle)) <= declared
+
+
+def test_a_real_table_name_in_capitals_points_to_its_logical_name(project: Path):
+    add_environment(project, "prod")
+    write_model(project, "SELECT * FROM PROD_SALES.silver.orders")
+
+    [failure] = failures(project)
+
+    assert failure["rule"] == "MSN205"
+    assert "PROD_SALES.silver.orders is a real table name" in failure["message"]
+    assert "sales.silver.orders" in failure["fix"]
+
+
+def test_a_typo_in_capitals_is_still_unresolved(project: Path):
+    write_model(project, "SELECT * FROM Sales.Silver.Ordrs")
+
+    [failure] = failures(project)
+
+    assert failure["rule"] == "MSN201"
+    assert "Sales.Silver.Ordrs" in failure["message"]
+
+
+def test_a_cte_body_reading_its_own_name_in_another_case_is_unresolved(project: Path):
+    write_model(project, "WITH Orders AS (\nSELECT * FROM orders)\nSELECT * FROM ORDERS")
+
+    [failure] = failures(project)
+
+    assert failure["rule"] == "MSN201"
+    assert failure["line"] == 2
+
+
+def test_one_table_in_two_cases_is_one_read_and_one_typo_is_reported_once(project: Path):
+    query = "SELECT * FROM sales.silver.orders JOIN SALES.SILVER.ORDERS USING (order_id)"
+    assert sql.reads(query) == {ORDERS}
+
+    write_model(project, "SELECT * FROM sales.silver.ordrs JOIN Sales.Silver.ORDRS USING (id)")
+    [failure] = failures(project)
+    assert failure["rule"] == "MSN201"
