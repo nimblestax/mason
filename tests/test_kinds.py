@@ -63,10 +63,8 @@ def test_every_kind_has_a_schema_that_requires_kind_and_version(kind: str):
     assert result.exit_code == 0, result.output
     json_schema = json.loads(result.stdout)["result"]["json_schema"]
     assert {"kind", "version"} <= set(json_schema["required"])
-    assert json_schema["properties"]["kind"] == {
-        "const": kind,
-        "description": "The Kind of this file.",
-    }
+    assert json_schema["properties"]["kind"]["const"] == kind
+    assert json_schema["properties"]["kind"]["description"] == "The Kind of this file."
     Draft202012Validator.check_schema(json_schema)
 
 

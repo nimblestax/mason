@@ -24,8 +24,7 @@ class Project:
 
 
 def load(root: Path) -> Project:
-    _require_valid(config.check(root, root / platform.FILE_NAME, platform.KIND))
-    contract = platform.load(root)
+    contract = config.load(root, root / platform.FILE_NAME, platform.KIND, Platform)
     folders = {domain: root / "domains" / domain for domain in contract.domains}
     _require_valid([p for folder in folders.values() for p in _problems(root, folder)])
     sources: list[Source] = []
