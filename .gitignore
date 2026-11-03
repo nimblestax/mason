@@ -3,5 +3,5 @@
 __pycache__/
 .env
 CLAUDE.local.md
-build/
+/build/
 dist/

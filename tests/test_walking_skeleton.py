@@ -9,10 +9,10 @@ import pytest
 import yaml
 from typer.testing import CliRunner
 
-from mason import deploy
 from mason.cli import app
-from mason.databricks import WorkspaceError
-from mason.project import load
+from mason.deploy import deploy
+from mason.deploy.databricks import WorkspaceError
+from mason.load.project import load
 
 runner = CliRunner()
 

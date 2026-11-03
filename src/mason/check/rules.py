@@ -2,8 +2,8 @@
 
 from mason import names, sql
 from mason.diagnostics import Diagnostic, error
+from mason.load.project import Project
 from mason.names import LogicalName
-from mason.project import Project
 
 
 def check(project: Project) -> list[Diagnostic]:

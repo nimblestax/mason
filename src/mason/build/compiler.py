@@ -3,10 +3,11 @@
 import shutil
 from pathlib import Path
 
-from mason import bundle, names, sql
+from mason import names, sql
+from mason.build import bundle
 from mason.kinds import model, seed, source
+from mason.load.project import Project
 from mason.names import LogicalName
-from mason.project import Project
 
 BUILD_FOLDER = "build"
 

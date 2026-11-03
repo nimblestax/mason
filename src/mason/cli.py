@@ -12,11 +12,14 @@ from typing import Annotated, Any, NoReturn
 import typer
 from typer.core import TyperGroup
 
-from mason import compiler, config, output, project, rules, scaffold
-from mason import deploy as delivery
-from mason.databricks import DatabricksCli
+from mason import output, scaffold
+from mason.build import compiler
+from mason.check import rules
+from mason.deploy import deploy as delivery
+from mason.deploy.databricks import DatabricksCli
 from mason.diagnostics import USAGE_OR_ENVIRONMENT, Diagnostic, Failure, error
 from mason.kinds import KINDS, platform
+from mason.load import config, project
 
 EXIT_CODES = "Exit codes: 0 clean, 1 rule failures, 2 usage or environment error."
 

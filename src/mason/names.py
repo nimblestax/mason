@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass
 
 from mason.kinds.source import Source
-from mason.project import Project
+from mason.load.project import Project
 
 PLACEHOLDER = re.compile(r"\$\{(\w+)\}")
 
