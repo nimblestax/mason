@@ -8,7 +8,7 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
 from mason.diagnostics import Diagnostic, error
-from mason.kinds.base import STRICT, ExactInteger, InDomain
+from mason.kinds.base import CONFIG_SUFFIXES, STRICT, ExactInteger, InDomain, config_files
 
 KIND = "model"
 FOLDER = "models"
@@ -53,7 +53,7 @@ def problems(root: Path, folder: Path, models: list[Model]) -> list[Diagnostic]:
     unnamed = [
         _sql_without_config(_relative(root, sql_file), sql_file.stem)
         for sql_file in sorted(folder.glob("*.sql"))
-        if not sql_file.with_suffix(".yaml").exists() and not _is_named(sql_file)
+        if not _has_config_beside(sql_file) and not _is_named(sql_file)
     ]
     return missing + unnamed
 
@@ -62,9 +62,13 @@ def generate(model: Model, target: str, sql: str) -> str:
     return f"CREATE OR REFRESH MATERIALIZED VIEW {target} AS\n{sql}"
 
 
+def _has_config_beside(sql_file: Path) -> bool:
+    return any(sql_file.with_suffix(suffix).exists() for suffix in CONFIG_SUFFIXES)
+
+
 def _is_named(sql_file: Path) -> bool:
     """Whether any config file beside it names it, even one that's invalid in other ways."""
-    return any(_names(file, sql_file.name) for file in sql_file.parent.glob("*.yaml"))
+    return any(_names(file, sql_file.name) for file in config_files(sql_file.parent))
 
 
 def _names(file: Path, sql: str) -> bool:

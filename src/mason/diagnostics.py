@@ -25,8 +25,11 @@ RULES = {
     "MSN114": "seed-row-mismatch",
     "MSN115": "unsupported-seed-type",
     "MSN116": "invalid-expectation",
+    "MSN117": "invalid-name",
     "MSN118": "invalid-delete-when",
     "MSN119": "invalid-sequence-by",
+    "MSN120": "duplicate-config-file",
+    "MSN121": "unlisted-domain-folder",
     "MSN201": "unresolved-logical-name",
     "MSN202": "duplicate-table",
     "MSN203": "unparseable-sql",
@@ -40,6 +43,9 @@ RULES = {
     "MSN903": "databricks-cli-missing",
     "MSN904": "databricks-command-failed",
     "MSN905": "unexpected-error",
+    "MSN906": "pipeline-column-not-found",
+    "MSN907": "expectation-failed",
+    "MSN908": "pipeline-failed",
 }
 
 

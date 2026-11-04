@@ -3,6 +3,7 @@
 import json
 import os
 import subprocess
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -27,6 +28,9 @@ class FakeWorkspace:
 
     def run_job(self, package: Path, target: str, job: str) -> None:
         self._record("run", package, target, job)
+
+    def pipeline_errors(self, package: Path, target: str, since: datetime) -> list[str]:
+        return []
 
     def _record(self, *call) -> None:
         self.calls.append(call)
