@@ -138,6 +138,68 @@ KEYS (order_id)
     assert f"FROM STREAM({BRONZE_TABLE})\nWHERE NOT (coalesce(amount > 0, false));\n" in code
 
 
+UPSERT_WITH_DELETES = (
+    "silver:\n"
+    "  keys: [order_id]\n"
+    "  sequence_by: updated_at\n"
+    "  delete_when: op = 'D'\n"
+    "  expectations:\n"
+)
+
+
+def test_a_delete_skips_every_quarantining_rule_so_it_always_reaches_the_upsert(project: Path):
+    declare_silver(
+        project, UPSERT_WITH_DELETES + "    - name: has_email\n      expect: email IS NOT NULL\n"
+    )
+
+    code = generated(project)
+
+    assert f"""CREATE TEMPORARY VIEW conformed_orders
+AS SELECT *
+FROM STREAM({BRONZE_TABLE})
+WHERE coalesce(op = 'D', false) OR coalesce(email IS NOT NULL, false);
+""" in code
+    assert f"""  ) AS _quarantine_reason
+FROM STREAM({BRONZE_TABLE})
+WHERE NOT (coalesce(op = 'D', false) OR coalesce(email IS NOT NULL, false));
+""" in code
+
+
+def test_a_delete_skips_several_quarantining_rules_at_once(project: Path):
+    declare_silver(
+        project,
+        UPSERT_WITH_DELETES
+        + "    - name: has_email\n      expect: email IS NOT NULL\n"
+        + "    - name: positive_amount\n      expect: amount > 0\n",
+    )
+
+    code = generated(project)
+
+    met = "(coalesce(email IS NOT NULL, false) AND coalesce(amount > 0, false))"
+    assert f"WHERE coalesce(op = 'D', false) OR {met};\n" in code
+    assert f"WHERE NOT (coalesce(op = 'D', false) OR {met});\n" in code
+
+
+def test_a_warn_or_fail_rule_passes_a_delete(project: Path):
+    declare_silver(
+        project,
+        UPSERT_WITH_DELETES
+        + "    - name: has_email\n      expect: email IS NOT NULL\n      action: warn\n"
+        + "    - name: positive_amount\n      expect: amount > 0\n      action: fail\n",
+    )
+
+    code = generated(project)
+
+    warn = "coalesce(op = 'D', false) OR coalesce(email IS NOT NULL, false)"
+    fail = "coalesce(op = 'D', false) OR coalesce(amount > 0, false)"
+    assert f"""CREATE TEMPORARY VIEW conformed_orders (
+  CONSTRAINT has_email EXPECT ({warn}),
+  CONSTRAINT positive_amount EXPECT ({fail}) ON VIOLATION FAIL UPDATE
+)
+""" in code
+    assert "_quarantine" not in code
+
+
 def test_an_upsert_with_no_expectations_still_reads_bronze_directly(project: Path):
     declare_silver(project, "silver:\n  keys: [order_id]\n  sequence_by: updated_at\n")
 

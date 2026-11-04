@@ -14,12 +14,30 @@ FROM STREAM read_files('/Volumes/dev_sales/bronze/landing/orders', format => 'js
 
 CREATE OR REFRESH STREAMING TABLE dev_sales.silver.orders;
 
-CREATE FLOW upsert_orders AS AUTO CDC INTO dev_sales.silver.orders
+CREATE TEMPORARY VIEW conformed_orders (
+  CONSTRAINT known_status EXPECT (coalesce(operation = 'DELETE', false) OR coalesce(status IN ('open', 'shipped', 'cancelled'), false)),
+  CONSTRAINT has_region EXPECT (coalesce(operation = 'DELETE', false) OR coalesce(region IS NOT NULL, false)) ON VIOLATION FAIL UPDATE
+)
+AS SELECT *
 FROM STREAM(dev_sales.bronze.orders)
+WHERE coalesce(operation = 'DELETE', false) OR (coalesce(customer_id IS NOT NULL, false) AND coalesce(amount > 0, false));
+
+CREATE FLOW upsert_orders AS AUTO CDC INTO dev_sales.silver.orders
+FROM STREAM(conformed_orders)
 KEYS (region, order_id)
 APPLY AS DELETE WHEN operation = 'DELETE'
 SEQUENCE BY updated_at
 STORED AS SCD TYPE 2;
+
+CREATE OR REFRESH STREAMING TABLE dev_sales.silver.orders_quarantine
+AS SELECT
+  *,
+  concat_ws(', ',
+    IF(coalesce(customer_id IS NOT NULL, false), NULL, 'has_customer'),
+    IF(coalesce(amount > 0, false), NULL, 'positive_amount')
+  ) AS _quarantine_reason
+FROM STREAM(dev_sales.bronze.orders)
+WHERE NOT (coalesce(operation = 'DELETE', false) OR (coalesce(customer_id IS NOT NULL, false) AND coalesce(amount > 0, false)));
 
 CREATE OR REFRESH STREAMING TABLE dev_sales.bronze.refunds
 TBLPROPERTIES ('pipelines.reset.allowed' = 'false')

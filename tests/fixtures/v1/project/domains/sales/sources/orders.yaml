@@ -7,3 +7,15 @@ silver:
   sequence_by: updated_at
   delete_when: operation = 'DELETE'
   scd: 2
+  expectations:
+    - name: has_customer
+      expect: customer_id IS NOT NULL
+    - name: positive_amount
+      expect: amount > 0
+      action: quarantine
+    - name: known_status
+      expect: status IN ('open', 'shipped', 'cancelled')
+      action: warn
+    - name: has_region
+      expect: region IS NOT NULL
+      action: fail
