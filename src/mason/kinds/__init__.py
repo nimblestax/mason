@@ -15,5 +15,10 @@ def json_schemas(kind: str) -> dict[int, dict[str, Any]]:
     return {n: version.model_json_schema() for n, version in KINDS[kind].VERSIONS.items()}
 
 
+def latest_schema(kind: str) -> tuple[int, dict[str, Any]]:
+    """A Kind's newest version and its JSON Schema: what `mason schema` and its page describe."""
+    return max(json_schemas(kind).items())
+
+
 def versions(kind: str) -> list[int]:
     return sorted(KINDS[kind].VERSIONS)

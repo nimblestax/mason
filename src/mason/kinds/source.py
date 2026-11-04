@@ -77,8 +77,9 @@ class SilverV1(BaseModel):
     delete_when: Text | None = Field(
         default=None, description="A SQL condition that marks a change as a delete."
     )
+    # A plain default, not a factory, so the schema shows it. Pydantic copies it for each Source.
     expectations: list[ExpectationV1] = Field(
-        default_factory=list,
+        default=[],
         description=(
             "Row-level rules each row of silver is checked against, in every Environment."
             " On an upsert, a row where `delete_when` is true skips them."
@@ -193,8 +194,10 @@ class SourceV1(InDomain):
     format: Literal["avro", "binaryFile", "csv", "json", "orc", "parquet", "text", "xml"] = Field(
         description="The format of the files at `path`."
     )
+    # The schema shows the default as `{}`: leaving `silver` out gives each field inside its own.
     silver: SilverV1 = Field(
         default_factory=SilverV1,
+        json_schema_extra={"default": {}},
         description=(
             "How silver is written, with `keys`, `sequence_by`, `scd` and `delete_when`. "
             "With no keys, it is append-only. `expectations` lists the rules each row must meet,"
