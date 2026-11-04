@@ -11,7 +11,7 @@ from typing import Annotated, Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from mason.diagnostics import Diagnostic, error
-from mason.kinds.base import STRICT, ExactInteger, InDomain
+from mason.kinds.base import STRICT, ColumnName, ExactInteger, InDomain
 from mason.statements import listed, statement
 
 KIND = "seed"
@@ -24,8 +24,6 @@ DECIMAL_TYPE = re.compile(r"DECIMAL(?:\(\s*(\d+)\s*(?:,\s*(\d+)\s*)?\))?")
 DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 TIMESTAMP_NTZ = re.compile(r"\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(\.\d{1,6})?")
 TIMESTAMP = re.compile(TIMESTAMP_NTZ.pattern + r"(Z|[+-]\d{2}:\d{2})?")
-
-ColumnName = Annotated[str, Field(pattern=r"^[A-Za-z_][A-Za-z0-9_]*$")]
 
 
 class SeedV1(InDomain):

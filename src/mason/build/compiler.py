@@ -41,6 +41,7 @@ def generated_files(project: Project) -> dict[Path, str]:
 def write_package(project: Project) -> Path:
     package = project.root / BUILD_FOLDER
     shutil.rmtree(package, ignore_errors=True)
+    package.mkdir()
     for relative, content in generated_files(project).items():
         target = package / relative
         target.parent.mkdir(parents=True, exist_ok=True)

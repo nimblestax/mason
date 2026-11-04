@@ -2,6 +2,7 @@
 
 from mason import names, sql
 from mason.diagnostics import Diagnostic, error
+from mason.kinds.model import Model
 from mason.load.project import Project
 from mason.names import LogicalName
 
@@ -9,6 +10,7 @@ from mason.names import LogicalName
 def check(project: Project) -> list[Diagnostic]:
     known = _tables(project)
     diagnostics = []
+    reads: dict[LogicalName, set[LogicalName]] = {}
     for model in project.models:
         file = model.sql_file.relative_to(project.root).as_posix()
         try:
@@ -16,12 +18,18 @@ def check(project: Project) -> list[Diagnostic]:
         except sql.Unparseable as failure:
             diagnostics.append(_unparseable(file, failure))
             continue
+        reads[_gold(project, model)] = set(query.reads)
         diagnostics += _reads(project, known, file, query)
         diagnostics += [_unqualified(file, name) for name in query.unqualified]
         diagnostics += [_computed(file, computed) for computed in query.computed]
         diagnostics += [_file_read(file, found) for found in query.file_reads]
         diagnostics += [_raw_placeholder(file, found) for found in query.raw_placeholders]
-    return diagnostics + _seeds_named_like_sources(project) + _named_like_a_quarantine(project)
+    return (
+        diagnostics
+        + _cycles(project, reads)
+        + _seeds_named_like_sources(project)
+        + _named_like_a_quarantine(project)
+    )
 
 
 def _reads(project: Project, known: set[LogicalName], file: str, query: sql.Query):
@@ -40,6 +48,48 @@ def _reads(project: Project, known: set[LogicalName], file: str, query: sql.Quer
     return diagnostics
 
 
+def _gold(project: Project, model: Model) -> LogicalName:
+    return LogicalName(model.domain, project.platform.model_layers[-1], model.name)
+
+
+def _cycles(project: Project, reads: dict[LogicalName, set[LogicalName]]) -> list[Diagnostic]:
+    """Each loop of Gold Models reading each other, found once by a depth-first walk."""
+    files = {
+        _gold(project, model): model.sql_file.relative_to(project.root).as_posix()
+        for model in project.models
+    }
+    finished: set[LogicalName] = set()
+    diagnostics = []
+
+    def walk(model: LogicalName, path: list[LogicalName]) -> None:
+        path.append(model)
+        for read in sorted(reads[model] & reads.keys(), key=_dotted):
+            if read in path:
+                cycle = path[path.index(read) :]
+                first = cycle.index(min(cycle, key=_dotted))
+                diagnostics.append(_cycle(files, cycle[first:] + cycle[:first]))
+            elif read not in finished:
+                walk(read, path)
+        path.pop()
+        finished.add(model)
+
+    for model in sorted(reads, key=_dotted):
+        if model not in finished:
+            walk(model, [])
+    return sorted(diagnostics, key=lambda diagnostic: diagnostic.file)
+
+
+def _cycle(files: dict[LogicalName, str], cycle: list[LogicalName]) -> Diagnostic:
+    loop = " → ".join(_dotted(model) for model in [*cycle, cycle[0]])
+    return error(
+        "MSN208",
+        files[cycle[0]],
+        "A Gold Model can't read itself, directly or through other Gold Models,"
+        f" because each must be built before it's read: {loop}.",
+        "Remove one of these reads, so each Gold Model reads only tables built before it.",
+    )
+
+
 def _tables(project: Project) -> set[LogicalName]:
     tables = set()
     for source in project.sources:
@@ -51,7 +101,7 @@ def _tables(project: Project) -> set[LogicalName]:
     for seed in project.seeds:
         tables.add(LogicalName(seed.domain, project.platform.source_layers[1], seed.name))
     for model in project.models:
-        tables.add(LogicalName(model.domain, project.platform.model_layers[-1], model.name))
+        tables.add(_gold(project, model))
     return tables
 
 
