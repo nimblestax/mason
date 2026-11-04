@@ -130,7 +130,7 @@ def problems(root: Path, folder: Path, sources: list[Source]) -> list[Diagnostic
 
 
 def generate(source: Source, path: str, bronze: str, silver: str) -> str:
-    """Bronze, then the statements that write silver, each followed by a blank line."""
+    """Bronze, then the statements that write silver, with a blank line between each."""
     return "\n\n".join([_bronze(source, path, bronze), *_silver(source, bronze, silver)]) + "\n"
 
 
