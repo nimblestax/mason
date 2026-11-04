@@ -20,7 +20,7 @@ def check(project: Project) -> list[Diagnostic]:
         diagnostics += [_unqualified(file, name) for name in query.unqualified]
         diagnostics += [_computed(file, computed) for computed in query.computed]
         diagnostics += [_file_read(file, found) for found in query.file_reads]
-    return diagnostics + _seeds_named_like_sources(project)
+    return diagnostics + _seeds_named_like_sources(project) + _named_like_a_quarantine(project)
 
 
 def _reads(project: Project, known: set[LogicalName], file: str, query: sql.Query):
@@ -44,6 +44,9 @@ def _tables(project: Project) -> set[LogicalName]:
     for source in project.sources:
         for layer in project.platform.source_layers:
             tables.add(LogicalName(source.domain, layer, source.name))
+        if source.silver.quarantining:
+            silver = project.platform.source_layers[1]
+            tables.add(LogicalName(source.domain, silver, source.quarantine))
     for seed in project.seeds:
         tables.add(LogicalName(seed.domain, project.platform.source_layers[1], seed.name))
     for model in project.models:
@@ -63,6 +66,27 @@ def _seeds_named_like_sources(project: Project) -> list[Diagnostic]:
         )
         for seed in project.seeds
         if (seed.domain, seed.name) in sources
+    ]
+
+
+def _named_like_a_quarantine(project: Project) -> list[Diagnostic]:
+    """A Source's Quarantine table is in silver's schema, so no other table may take its name."""
+    silver = project.platform.source_layers[1]
+    quarantines = {
+        (source.domain, source.quarantine): source.name
+        for source in project.sources
+        if source.silver.quarantining
+    }
+    return [
+        error(
+            "MSN202",
+            table.config_file.relative_to(project.root).as_posix(),
+            f"{table.domain}.{silver}.{table.name} is also the Quarantine table"
+            f" of the Source {quarantines[(table.domain, table.name)]}.",
+            "Rename this file, so each table has its own name.",
+        )
+        for table in (*project.sources, *project.seeds)
+        if (table.domain, table.name) in quarantines
     ]
 
 

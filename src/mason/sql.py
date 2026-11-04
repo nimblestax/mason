@@ -9,9 +9,8 @@ from sqlglot.errors import ParseError, SqlglotError
 from sqlglot.optimizer.scope import traverse_scope
 from sqlglot.tokens import Token, TokenType
 
+from mason.conditions import DIALECT
 from mason.names import LogicalName
-
-DIALECT = "databricks"
 
 # Table-valued functions that read nothing, so a Gold Model may call them. Any other fails closed.
 GENERATORS = {

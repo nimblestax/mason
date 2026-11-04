@@ -20,8 +20,11 @@ def generated_files(project: Project) -> dict[Path, str]:
     for item in project.sources:
         bronze = names.placeholders(LogicalName(item.domain, bronze_layer, item.name))
         silver = names.placeholders(LogicalName(item.domain, silver_layer, item.name))
+        quarantine = names.placeholders(LogicalName(item.domain, silver_layer, item.quarantine))
         path = Path("src") / item.domain / "ingest" / f"{item.name}.sql"
-        files[path] = source.generate(item, names.path_placeholder(item), bronze, silver)
+        files[path] = source.generate(
+            item, names.path_placeholder(item), bronze, silver, quarantine
+        )
     for item in project.seeds:
         target = names.placeholders(LogicalName(item.domain, silver_layer, item.name))
         files[Path("src") / item.domain / "ingest" / f"{item.name}.sql"] = seed.generate(
