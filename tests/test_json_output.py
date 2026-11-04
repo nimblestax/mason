@@ -246,6 +246,9 @@ REGISTERED_RULES = {
     "MSN903": "databricks-cli-missing",
     "MSN904": "databricks-command-failed",
     "MSN905": "unexpected-error",
+    "MSN906": "pipeline-column-not-found",
+    "MSN907": "expectation-failed",
+    "MSN908": "pipeline-failed",
 }
 
 
@@ -357,10 +360,11 @@ def test_every_project_rule_reports_a_message_and_a_fix_and_exits_1(
 
 
 def test_a_new_rule_must_be_tested_here():
-    """The tests above cover these, by name. A new rule joins one of the two lists."""
+    """The tests above, and the refresh failure tests, cover these by name. A new rule joins one."""
     usage_and_environment = {"MSN901", "MSN902", "MSN903", "MSN904", "MSN905"}
+    refresh_failures = {"MSN906", "MSN907", "MSN908"}
 
-    assert set(RULES) == set(INVALID_PROJECTS) | usage_and_environment
+    assert set(RULES) == set(INVALID_PROJECTS) | usage_and_environment | refresh_failures
 
 
 def test_the_docs_state_every_exit_code_and_every_rule():

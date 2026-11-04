@@ -100,6 +100,7 @@ resources:
         path_sales__customers: ${var.path_sales__customers}
         path_sales__orders: ${var.path_sales__orders}
         path_sales__refunds: ${var.path_sales__refunds}
+        pipelines.numUpdateRetryAttempts: '1'
     sales_gold:
       name: pinned_v1_sales_gold
       catalog: ${var.catalog_sales_gold}
@@ -125,6 +126,7 @@ resources:
         path_sales__customers: ${var.path_sales__customers}
         path_sales__orders: ${var.path_sales__orders}
         path_sales__refunds: ${var.path_sales__refunds}
+        pipelines.numUpdateRetryAttempts: '1'
     finance_ingest:
       name: pinned_v1_finance_ingest
       catalog: ${var.catalog_finance_bronze}
@@ -150,6 +152,7 @@ resources:
         path_sales__customers: ${var.path_sales__customers}
         path_sales__orders: ${var.path_sales__orders}
         path_sales__refunds: ${var.path_sales__refunds}
+        pipelines.numUpdateRetryAttempts: '1'
   jobs:
     refresh:
       name: pinned_v1_refresh

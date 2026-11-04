@@ -92,5 +92,10 @@ Rule IDs are `MSN` plus three digits. An ID never changes meaning, and a retired
 | `MSN903` | `databricks-cli-missing` | `databricks` isn't on the PATH. |
 | `MSN904` | `databricks-command-failed` | A Databricks CLI command failed. |
 | `MSN905` | `unexpected-error` | Mason stopped on something it didn't expect, with a traceback on stderr. |
+| `MSN906` | `pipeline-column-not-found` | The refresh failed because a pipeline names a column its table doesn't have, often an Expectation on a column bronze doesn't have yet. See [Recover from a failed refresh](../guides/recover-from-a-failed-refresh.md). |
+| `MSN907` | `expectation-failed` | The refresh failed because a row broke an Expectation whose `action` is `fail`. See [Recover from a failed refresh](../guides/recover-from-a-failed-refresh.md). |
+| `MSN908` | `pipeline-failed` | The refresh failed with another pipeline error. The message is the pipeline's own. |
 
 `mason schema <unknown kind>` reports `MSN102` and exits 2, because the mistake is on the command line. Every `MSN1xx` and `MSN2xx` rule exits 1 when found in a project.
+
+When `mason deploy` refreshes an Environment and a pipeline update fails, the diagnostic's `message` is the pipeline's own error, read from its event log: `MSN906`, `MSN907` or `MSN908`, each exiting 2. A pipeline retries a failed update once, so an error a retry can't fix is reported in about a minute. When no pipeline error can be read, Mason reports `MSN904` with the Databricks CLI's last lines.
