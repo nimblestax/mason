@@ -3,13 +3,16 @@ import re
 import shlex
 from importlib.metadata import version
 from pathlib import Path
+from typing import Any
 
 import pytest
 from test_docs import front_matter
+from typer.main import get_command
 from typer.testing import CliRunner
 
 from mason import reference
 from mason.cli import app
+from mason.diagnostics import EXIT_CODES
 from mason.kinds import KINDS, latest_schema
 from mason.registry import RULES, Example
 
@@ -154,6 +157,68 @@ def test_a_rule_page_links_the_principle_behind_it_where_there_is_one(tmp_path: 
     enforced = (tmp_path / "reference/rules/msn201.md").read_text()
     assert "(https://nimblestax.com/way/every-catalog-is-one-domain)" in enforced
     assert "nimblestax.com/way" not in (tmp_path / "reference/rules/msn203.md").read_text()
+
+
+def commands() -> dict[str, Any]:
+    group: Any = get_command(app)
+    return group.commands
+
+
+def test_every_command_gets_a_page_listing_its_options_and_exit_codes(tmp_path: Path):
+    reference.write(tmp_path)
+
+    for name, registered in commands().items():
+        text = (tmp_path / f"reference/commands/{name}.md").read_text()
+        page = front_matter(text)
+        assert page["title"] == f"mason {name}"
+        assert page["description"] == registered.help
+        assert page["generated"] is True
+        for parameter in registered.params:
+            assert f"`{parameter.opts[0]}`" in text, f"{name} {parameter.opts[0]}"
+        for code, meaning in EXIT_CODES.items():
+            assert f"| {code} | {meaning} |" in text
+
+
+@pytest.mark.parametrize(
+    "command",
+    [["init"], ["validate"], ["schema", "source"], ["compile"], ["compile", "--env", "dev"]],
+)
+def test_a_command_page_documents_every_field_of_its_json_result(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, command: list[str]
+):
+    reference.write(tmp_path / "docs")
+    monkeypatch.chdir(tmp_path)
+    assert CliRunner().invoke(app, ["init"]).exit_code == 0
+
+    envelope = json.loads(CliRunner().invoke(app, [*command, "--json"]).stdout)
+
+    text = (tmp_path / f"docs/reference/commands/{command[0]}.md").read_text()
+    assert f"`{envelope['schema']}`" in text
+    for field in envelope["result"]:
+        assert f"| `{field}` |" in text, field
+
+
+def test_the_json_page_documents_the_envelope_and_links_every_command_and_rule(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    reference.write(tmp_path / "docs")
+    monkeypatch.chdir(tmp_path)
+    CliRunner().invoke(app, ["init"])
+    (tmp_path / "domains/sales/models/fct_orders.sql").write_text("SELECT * FROM a.b.c")
+
+    envelope = json.loads(CliRunner().invoke(app, ["validate", "--json"]).stdout)
+
+    text = (tmp_path / "docs/reference/json-output.md").read_text()
+    page = front_matter(text)
+    assert page["generated"] is True
+    assert page["redirects"] == ["json-output"]
+    for field in [*envelope, *envelope["diagnostics"][0]]:
+        assert f"| `{field}` |" in text, field
+    for name in commands():
+        assert f"(commands/{name}.md)" in text, name
+    for code in RULES:
+        assert f"(rules/{code.lower()}.md)" in text, code
+    assert "\n## Rule IDs\n" in text
 
 
 def test_generated_pages_say_nothing_private(tmp_path: Path):

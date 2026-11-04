@@ -2,7 +2,7 @@
 
 import traceback
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import StrEnum
 from functools import wraps
 from inspect import Parameter, signature
@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Annotated, Any, NoReturn
 
 import typer
+from pydantic import BaseModel, Field
 from typer.core import TyperGroup
 
 from mason import output, scaffold
@@ -17,11 +18,15 @@ from mason.build import compiler
 from mason.check import rules
 from mason.deploy import deploy as delivery
 from mason.deploy.databricks import DatabricksCli
-from mason.diagnostics import USAGE_OR_ENVIRONMENT, Diagnostic, Failure, error
+from mason.diagnostics import EXIT_CODES, USAGE_OR_ENVIRONMENT, Diagnostic, Failure, error
 from mason.kinds import KINDS, latest_schema, platform
 from mason.load import config, project
 
-EXIT_CODES = "Exit codes: 0 clean, 1 rule failures, 2 usage or environment error."
+EPILOG = (
+    "Exit codes: "
+    + ", ".join(f"{code} {meaning.split(':')[0].lower()}" for code, meaning in EXIT_CODES.items())
+    + "."
+)
 
 
 class ReportingGroup(TyperGroup):
@@ -41,7 +46,7 @@ class ReportingGroup(TyperGroup):
             _report_failure(label or "usage", True, Failure([found], USAGE_OR_ENVIRONMENT))
 
 
-app = typer.Typer(cls=ReportingGroup, no_args_is_help=True, add_completion=False, epilog=EXIT_CODES)
+app = typer.Typer(cls=ReportingGroup, no_args_is_help=True, add_completion=False, epilog=EPILOG)
 
 
 class Ci(StrEnum):
@@ -53,11 +58,14 @@ JsonOption = Annotated[bool, typer.Option("--json", help="Print one JSON envelop
 
 
 @dataclass(frozen=True)
-class Outcome:
-    """What a command that succeeded tells a person, and tells a machine."""
+class Outcome[Result: BaseModel]:
+    """What a command that succeeded tells a person, and tells a machine.
+
+    A command's return annotation names its Result, which the reference documents.
+    """
 
     text: str
-    result: dict[str, Any] = field(default_factory=dict)
+    result: Result
 
 
 def command(name: str | None = None) -> Callable:
@@ -75,7 +83,7 @@ def command(name: str | None = None) -> Callable:
                 traceback.print_exc()
                 _report_failure(label, as_json, _unexpected(problem))
             if as_json:
-                typer.echo(output.envelope(label, True, outcome.result, []))
+                typer.echo(output.envelope(label, True, outcome.result.model_dump(), []))
             else:
                 typer.echo(outcome.text)
 
@@ -96,8 +104,7 @@ def command(name: str | None = None) -> Callable:
 
 def _report_failure(label: str, as_json: bool, failure: Failure) -> NoReturn:
     if as_json:
-        found = [diagnostic.as_dict() for diagnostic in failure.diagnostics]
-        typer.echo(output.envelope(label, False, {}, found))
+        typer.echo(output.envelope(label, False, {}, failure.diagnostics))
     else:
         for diagnostic in failure.diagnostics:
             _print(diagnostic)
@@ -132,34 +139,63 @@ def _print(diagnostic: Diagnostic) -> None:
     typer.echo(f"  Fix: {diagnostic.fix}")
 
 
+class Created(BaseModel):
+    project: str = Field(description="The folder the project was created in.")
+
+
 @command()
 def init(
     ci: Annotated[Ci, typer.Option("--ci", help="CI provider to write files for.")] = Ci.github,
     host: Annotated[str, typer.Option("--host", help="Workspace URL.")] = scaffold.PLACEHOLDER_HOST,
     root: ProjectOption = Path("."),
-) -> Outcome:
+) -> Outcome[Created]:
     """Create a working project."""
     scaffold.write_project(root, host, ci.value)
-    return Outcome(f"Created a Mason project in {root}", {"project": str(root)})
+    return Outcome(f"Created a Mason project in {root}", Created(project=str(root)))
+
+
+class Valid(BaseModel):
+    """Empty: `validate` reports what it finds as diagnostics."""
 
 
 @command()
-def validate(root: ProjectOption = Path(".")) -> Outcome:
+def validate(root: ProjectOption = Path(".")) -> Outcome[Valid]:
     """Check config and SQL references, with no workspace."""
     problems = rules.check(project.load(root))
     if problems:
         raise Failure(problems)
-    return Outcome("Valid.")
+    return Outcome("Valid.", Valid())
+
+
+class KindSchema(BaseModel):
+    kind: str = Field(description="The Kind described.")
+    version: int = Field(description="The newest version of the Kind this Mason supports.")
+    json_schema: dict[str, Any] = Field(description="The Kind's JSON Schema at that version.")
 
 
 @command()
-def schema(kind: Annotated[str, typer.Argument(help="The Kind to describe.")]) -> Outcome:
+def schema(
+    kind: Annotated[str, typer.Argument(help="The Kind to describe.")],
+) -> Outcome[KindSchema]:
     """Print a Kind's fields from the installed Mason. Needs no project."""
     if kind not in KINDS:
         raise Failure([config.unknown_kind(kind, "")], USAGE_OR_ENVIRONMENT)
     version, json_schema = latest_schema(kind)
-    result = {"kind": kind, "version": version, "json_schema": json_schema}
+    result = KindSchema(kind=kind, version=version, json_schema=json_schema)
     return Outcome(output.fields(kind, version, json_schema), result)
+
+
+class Package(BaseModel):
+    """Without `--env`, `compile` writes the generated code."""
+
+    package: str = Field(description="The folder the generated code was written to.")
+
+
+class Sql(BaseModel):
+    """With `--env`, `compile` prints it instead."""
+
+    env: str = Field(description="The Environment the SQL is for.")
+    sql: str = Field(description="Every generated file as runnable SQL for that Environment.")
 
 
 @command("compile")
@@ -168,24 +204,28 @@ def compile_(
         str | None, typer.Option("--env", help="Print runnable SQL for this Environment.")
     ] = None,
     root: ProjectOption = Path("."),
-) -> Outcome:
+) -> Outcome[Package | Sql]:
     """Write generated code, or print it for one Environment."""
     loaded = project.load(root)
     if env:
         _require_environment(loaded, env)
         sql = compiler.print_for(loaded, env)
-        return Outcome(sql, {"env": env, "sql": sql})
+        return Outcome(sql, Sql(env=env, sql=sql))
     package = compiler.write_package(loaded)
-    return Outcome(f"Wrote {package}", {"package": str(package)})
+    return Outcome(f"Wrote {package}", Package(package=str(package)))
+
+
+class Deployed(BaseModel):
+    env: str = Field(description="The Environment deployed and refreshed.")
 
 
 @command()
 def deploy(
     env: Annotated[str, typer.Option("--env", help="The Environment to deploy.")],
     root: ProjectOption = Path("."),
-) -> Outcome:
+) -> Outcome[Deployed]:
     """Deploy to an Environment and refresh its tables."""
     loaded = project.load(root)
     _require_environment(loaded, env)
     delivery.deploy(loaded, env, DatabricksCli())
-    return Outcome(f"Deployed to {env}", {"env": env})
+    return Outcome(f"Deployed to {env}", Deployed(env=env))
