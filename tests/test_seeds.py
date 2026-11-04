@@ -9,6 +9,7 @@ import yaml
 from typer.testing import CliRunner
 
 from mason.cli import app
+from mason.kinds.seed import _empty_filter
 
 runner = CliRunner()
 
@@ -325,3 +326,8 @@ def test_generated_sql_parses_for_a_row_needing_every_kind_of_escape(project: Pa
     statement = compiled(project).split("\n", 1)[1].removeprefix("AS ").rstrip(";\n")
 
     sqlglot.parse_one(statement, dialect="databricks")
+
+
+def test_the_empty_filter_is_a_line_only_when_there_are_no_rows():
+    assert _empty_filter((("AU",),)) is None
+    assert _empty_filter(()) == "WHERE false"
