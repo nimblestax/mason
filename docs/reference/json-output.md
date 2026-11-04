@@ -77,7 +77,9 @@ Rule IDs are `MSN` plus three digits. An ID never changes meaning, and a retired
 | `MSN113` | `seed-header-mismatch` | The first line of a Seed's file doesn't name each declared column once. |
 | `MSN114` | `seed-row-mismatch` | A row of a Seed's file has the wrong number of values, or a value that doesn't fit its column's type. |
 | `MSN115` | `unsupported-seed-type` | A Seed's column has a type Mason can't check values against. |
-| `MSN116` | `invalid-expectation` | An Expectation's `expect` isn't one SQL condition on one row: it doesn't parse, or it holds a query, an aggregate, a window function or a comment. |
+| `MSN116` | `invalid-expectation` | An Expectation's `expect` isn't one SQL condition on one row: it doesn't parse, or it holds a query, an aggregate, a window function, a comment or an alias. |
+| `MSN118` | `invalid-delete-when` | A Source's `silver.delete_when` isn't one SQL condition on one row, for the same reasons as `MSN116`. |
+| `MSN119` | `invalid-sequence-by` | A Source's `silver.sequence_by` isn't one SQL expression on one row, such as `updated_at` or `struct(updated_at, seq)`: it doesn't parse, or it holds a query, an aggregate, a window function, a comment or an alias. |
 | `MSN120` | `duplicate-config-file` | Two config files share a name in one folder, such as `orders.yaml` and `orders.yml`. Mason reads either ending, and writes `.yaml`. |
 | `MSN121` | `unlisted-domain-folder` | A folder under `domains/` isn't listed in `domains` in `mason.platform.yaml`, in the same case, so nothing in it is validated or deployed. |
 | `MSN201` | `unresolved-logical-name` | SQL reads a table that isn't in the project. |
@@ -86,6 +88,8 @@ Rule IDs are `MSN` plus three digits. An ID never changes meaning, and a retired
 | `MSN204` | `computed-table-name` | SQL builds a table name when it runs, such as `IDENTIFIER(...)`, so Mason can't see what it reads. |
 | `MSN205` | `real-table-name` | SQL reads a real table name, which names one Environment, instead of its Logical Name. |
 | `MSN206` | `file-read` | A Gold Model reads files or external data, such as `read_files(...)` or ``parquet.`/path` ``, instead of a table. |
+| `MSN207` | `raw-string-placeholder` | A raw string in a Gold Model's SQL, such as `r'${env}'`, holds `${`. The pipeline replaces `${name}` with a setting's value, even inside a string. Mason escapes `${` in ordinary strings and comments, but a raw string can't hold the escape. |
+| `MSN208` | `model-cycle` | Gold Models read themselves, or each other in a loop, so none of them can run first. |
 | `MSN901` | `usage-error` | The command line is wrong. |
 | `MSN902` | `unknown-environment` | `--env` isn't an Environment in the project. |
 | `MSN903` | `databricks-cli-missing` | `databricks` isn't on the PATH. |

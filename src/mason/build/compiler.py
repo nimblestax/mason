@@ -33,13 +33,15 @@ def generated_files(project: Project) -> dict[Path, str]:
     for item in project.models:
         target = names.placeholders(LogicalName(item.domain, gold_layer, item.name))
         path = Path("src") / item.domain / "gold" / f"{item.name}.sql"
-        files[path] = model.generate(item, target, sql.rewrite(item.query, names.placeholders))
+        query = sql.escape_placeholders(item.query)
+        files[path] = model.generate(item, target, sql.rewrite(query, names.placeholders))
     return files
 
 
 def write_package(project: Project) -> Path:
     package = project.root / BUILD_FOLDER
     shutil.rmtree(package, ignore_errors=True)
+    package.mkdir()
     for relative, content in generated_files(project).items():
         target = package / relative
         target.parent.mkdir(parents=True, exist_ok=True)
