@@ -1,0 +1,7 @@
+kind: source
+version: 1
+path: /Volumes/shared/refunds
+format: parquet
+silver:
+  keys: [refund_id]
+  sequence_by: refunded_at

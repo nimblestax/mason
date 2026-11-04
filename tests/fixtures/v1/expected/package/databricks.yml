@@ -1,0 +1,170 @@
+bundle:
+  name: pinned_v1
+sync:
+  include:
+  - src/**
+variables:
+  catalog_sales_bronze:
+    description: catalog_sales_bronze
+  schema_sales_bronze:
+    description: schema_sales_bronze
+  catalog_sales_silver:
+    description: catalog_sales_silver
+  schema_sales_silver:
+    description: schema_sales_silver
+  catalog_sales_gold:
+    description: catalog_sales_gold
+  schema_sales_gold:
+    description: schema_sales_gold
+  catalog_finance_bronze:
+    description: catalog_finance_bronze
+  schema_finance_bronze:
+    description: schema_finance_bronze
+  catalog_finance_silver:
+    description: catalog_finance_silver
+  schema_finance_silver:
+    description: schema_finance_silver
+  catalog_finance_gold:
+    description: catalog_finance_gold
+  schema_finance_gold:
+    description: schema_finance_gold
+  path_sales__customers:
+    description: path_sales__customers
+  path_sales__orders:
+    description: path_sales__orders
+  path_sales__refunds:
+    description: path_sales__refunds
+targets:
+  dev:
+    workspace:
+      host: https://dev.example.cloud.databricks.com
+    variables:
+      catalog_sales_bronze: dev_sales
+      schema_sales_bronze: bronze
+      catalog_sales_silver: dev_sales
+      schema_sales_silver: silver
+      catalog_sales_gold: dev_sales
+      schema_sales_gold: gold
+      catalog_finance_bronze: dev_finance
+      schema_finance_bronze: bronze
+      catalog_finance_silver: dev_finance
+      schema_finance_silver: silver
+      catalog_finance_gold: dev_finance
+      schema_finance_gold: gold
+      path_sales__customers: /Volumes/dev_sales/bronze/landing/customers/*.csv
+      path_sales__orders: /Volumes/dev_sales/bronze/landing/orders
+      path_sales__refunds: /Volumes/shared/refunds
+  prod:
+    workspace:
+      host: https://prod.example.cloud.databricks.com
+    variables:
+      catalog_sales_bronze: prod_sales
+      schema_sales_bronze: bronze
+      catalog_sales_silver: prod_sales
+      schema_sales_silver: silver
+      catalog_sales_gold: prod_sales
+      schema_sales_gold: gold
+      catalog_finance_bronze: prod_finance
+      schema_finance_bronze: bronze
+      catalog_finance_silver: prod_finance
+      schema_finance_silver: silver
+      catalog_finance_gold: prod_finance
+      schema_finance_gold: gold
+      path_sales__customers: /Volumes/prod_sales/bronze/landing/customers/*.csv
+      path_sales__orders: /Volumes/prod_sales/bronze/landing/orders
+      path_sales__refunds: /Volumes/shared/refunds
+resources:
+  pipelines:
+    sales_ingest:
+      name: pinned_v1_sales_ingest
+      catalog: ${var.catalog_sales_bronze}
+      schema: ${var.schema_sales_bronze}
+      serverless: true
+      channel: CURRENT
+      libraries:
+      - glob:
+          include: src/sales/ingest/**
+      configuration:
+        catalog_sales_bronze: ${var.catalog_sales_bronze}
+        schema_sales_bronze: ${var.schema_sales_bronze}
+        catalog_sales_silver: ${var.catalog_sales_silver}
+        schema_sales_silver: ${var.schema_sales_silver}
+        catalog_sales_gold: ${var.catalog_sales_gold}
+        schema_sales_gold: ${var.schema_sales_gold}
+        catalog_finance_bronze: ${var.catalog_finance_bronze}
+        schema_finance_bronze: ${var.schema_finance_bronze}
+        catalog_finance_silver: ${var.catalog_finance_silver}
+        schema_finance_silver: ${var.schema_finance_silver}
+        catalog_finance_gold: ${var.catalog_finance_gold}
+        schema_finance_gold: ${var.schema_finance_gold}
+        path_sales__customers: ${var.path_sales__customers}
+        path_sales__orders: ${var.path_sales__orders}
+        path_sales__refunds: ${var.path_sales__refunds}
+    sales_gold:
+      name: pinned_v1_sales_gold
+      catalog: ${var.catalog_sales_gold}
+      schema: ${var.schema_sales_gold}
+      serverless: true
+      channel: CURRENT
+      libraries:
+      - glob:
+          include: src/sales/gold/**
+      configuration:
+        catalog_sales_bronze: ${var.catalog_sales_bronze}
+        schema_sales_bronze: ${var.schema_sales_bronze}
+        catalog_sales_silver: ${var.catalog_sales_silver}
+        schema_sales_silver: ${var.schema_sales_silver}
+        catalog_sales_gold: ${var.catalog_sales_gold}
+        schema_sales_gold: ${var.schema_sales_gold}
+        catalog_finance_bronze: ${var.catalog_finance_bronze}
+        schema_finance_bronze: ${var.schema_finance_bronze}
+        catalog_finance_silver: ${var.catalog_finance_silver}
+        schema_finance_silver: ${var.schema_finance_silver}
+        catalog_finance_gold: ${var.catalog_finance_gold}
+        schema_finance_gold: ${var.schema_finance_gold}
+        path_sales__customers: ${var.path_sales__customers}
+        path_sales__orders: ${var.path_sales__orders}
+        path_sales__refunds: ${var.path_sales__refunds}
+    finance_ingest:
+      name: pinned_v1_finance_ingest
+      catalog: ${var.catalog_finance_bronze}
+      schema: ${var.schema_finance_bronze}
+      serverless: true
+      channel: CURRENT
+      libraries:
+      - glob:
+          include: src/finance/ingest/**
+      configuration:
+        catalog_sales_bronze: ${var.catalog_sales_bronze}
+        schema_sales_bronze: ${var.schema_sales_bronze}
+        catalog_sales_silver: ${var.catalog_sales_silver}
+        schema_sales_silver: ${var.schema_sales_silver}
+        catalog_sales_gold: ${var.catalog_sales_gold}
+        schema_sales_gold: ${var.schema_sales_gold}
+        catalog_finance_bronze: ${var.catalog_finance_bronze}
+        schema_finance_bronze: ${var.schema_finance_bronze}
+        catalog_finance_silver: ${var.catalog_finance_silver}
+        schema_finance_silver: ${var.schema_finance_silver}
+        catalog_finance_gold: ${var.catalog_finance_gold}
+        schema_finance_gold: ${var.schema_finance_gold}
+        path_sales__customers: ${var.path_sales__customers}
+        path_sales__orders: ${var.path_sales__orders}
+        path_sales__refunds: ${var.path_sales__refunds}
+  jobs:
+    refresh:
+      name: pinned_v1_refresh
+      tasks:
+      - task_key: sales_ingest
+        max_retries: 0
+        pipeline_task:
+          pipeline_id: ${resources.pipelines.sales_ingest.id}
+      - task_key: sales_gold
+        max_retries: 0
+        pipeline_task:
+          pipeline_id: ${resources.pipelines.sales_gold.id}
+        depends_on:
+        - task_key: sales_ingest
+      - task_key: finance_ingest
+        max_retries: 0
+        pipeline_task:
+          pipeline_id: ${resources.pipelines.finance_ingest.id}

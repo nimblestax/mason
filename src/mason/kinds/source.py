@@ -1,106 +1,131 @@
 """A Source: a declared external dataset landed in bronze and conformed into silver."""
 
-from dataclasses import dataclass
+from collections.abc import Callable
 from pathlib import Path
+from typing import Annotated, Any, Literal
 
-import yaml
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
+from pydantic_core import PydanticCustomError
+
+from mason.diagnostics import Diagnostic
+from mason.kinds.base import STRICT, ExactInteger, InDomain, unique
 
 KIND = "source"
-SCHEMAS = {
-    1: {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "title": "Mason Source",
-        "description": "An external dataset landed in bronze and conformed into silver.",
-        "type": "object",
-        "required": ["kind", "version", "path", "format"],
-        "additionalProperties": False,
-        "properties": {
-            "kind": {"const": "source", "description": "The Kind of this file."},
-            "version": {"const": 1, "description": "The schema version of this Kind."},
-            "path": {
-                "type": "string",
-                "minLength": 1,
-                "description": (
-                    "Where the files land, such as a Unity Catalog Volume path. "
-                    "`{env}` becomes the Environment's name."
-                ),
-            },
-            "format": {
-                "enum": ["avro", "binaryFile", "csv", "json", "orc", "parquet", "text", "xml"],
-                "description": "The format of the files at `path`.",
-            },
-            "silver": {
-                "type": "object",
-                "additionalProperties": False,
-                "description": (
-                    "How silver is written, with `keys`, `sequence_by`, `scd` and `delete_when`. "
-                    "With no keys, it is append-only."
-                ),
-                "properties": {
-                    "keys": {
-                        "type": "array",
-                        "items": {"type": "string", "minLength": 1},
-                        "minItems": 1,
-                        "uniqueItems": True,
-                        "description": "The columns that identify a row, which turn on upserts.",
-                    },
-                    "sequence_by": {
-                        "type": "string",
-                        "minLength": 1,
-                        "description": "The column or expression that orders changes to a key.",
-                    },
-                    "delete_when": {
-                        "type": "string",
-                        "minLength": 1,
-                        "description": "A SQL condition that marks a change as a delete.",
-                    },
-                    "scd": {
-                        "enum": [1, 2],
-                        "description": "1 keeps the latest row per key, 2 keeps every version.",
-                    },
+FOLDER = "sources"
+
+Text = Annotated[str, Field(min_length=1)]
+
+
+class SilverV1(BaseModel):
+    """How silver is written. With no `keys`, it is append-only."""
+
+    model_config = STRICT
+
+    # `keys` comes first, so the checks of the fields after it can see it.
+    keys: Annotated[list[Text], Field(min_length=1)] | None = Field(
+        default=None,
+        json_schema_extra={"uniqueItems": True},
+        description="The columns that identify a row, which turn on upserts.",
+    )
+    # Checked even when it's left out, because `keys` needs it.
+    sequence_by: Text | None = Field(
+        default=None,
+        validate_default=True,
+        description="The column or expression that orders changes to a key.",
+    )
+    scd: Annotated[Literal[1, 2], ExactInteger] = Field(
+        default=1, description="1 keeps the latest row per key, 2 keeps every version."
+    )
+    delete_when: Text | None = Field(
+        default=None, description="A SQL condition that marks a change as a delete."
+    )
+
+    @field_validator("keys")
+    @classmethod
+    def _keys_are_unique(cls, keys: list[str] | None) -> list[str] | None:
+        return None if keys is None else unique(keys, "key")
+
+    @field_validator("sequence_by")
+    @classmethod
+    def _sequence_by_goes_with_keys(cls, value: str | None, info: ValidationInfo) -> str | None:
+        if "keys" not in info.data:
+            return value  # `keys` is invalid, and its own problem says so.
+        if info.data["keys"] and value is None:
+            # A rule ID as the error type reaches the user as that rule, with this fix.
+            raise PydanticCustomError(
+                "MSN110",
+                "`silver.keys` needs `silver.sequence_by`, to order the changes to each key.",
+                {
+                    "fix": "Add `sequence_by` with the column that orders changes,"
+                    " or remove `keys` to append."
                 },
-            },
+            )
+        if not info.data["keys"] and value is not None:
+            raise _upsert_field_without_keys("sequence_by")
+        return value
+
+    @field_validator("scd", "delete_when")
+    @classmethod
+    def _only_with_keys(cls, value: Any, info: ValidationInfo) -> Any:
+        if "keys" in info.data and not info.data["keys"]:
+            raise _upsert_field_without_keys(str(info.field_name))
+        return value
+
+
+def _upsert_field_without_keys(name: str) -> PydanticCustomError:
+    return PydanticCustomError(
+        "MSN111",
+        "`silver.{name}` only applies to an upsert, and this Source has no `silver.keys`.",
+        {
+            "name": name,
+            "fix": "Add `keys` with the columns that identify a row,"
+            f" or remove `{name}` to append.",
         },
-    }
-}
+    )
 
 
-@dataclass(frozen=True)
-class Silver:
-    keys: tuple[str, ...] = ()
-    sequence_by: str | None = None
-    scd: int = 1
-    delete_when: str | None = None
+class SourceV1(InDomain):
+    """An external dataset landed in bronze and conformed into silver."""
 
+    model_config = ConfigDict(**STRICT, title="Mason Source")
 
-@dataclass(frozen=True)
-class Source:
-    domain: str
-    name: str
-    path: str
-    format: str
-    silver: Silver = Silver()
+    kind: Literal["source"] = Field(description="The Kind of this file.")
+    version: Annotated[Literal[1], ExactInteger] = Field(
+        description="The schema version of this Kind."
+    )
+    path: str = Field(
+        min_length=1,
+        description=(
+            "Where the files land, such as a Unity Catalog Volume path. "
+            "`{env}` becomes the Environment's name."
+        ),
+    )
+    format: Literal["avro", "binaryFile", "csv", "json", "orc", "parquet", "text", "xml"] = Field(
+        description="The format of the files at `path`."
+    )
+    silver: SilverV1 = Field(
+        default_factory=SilverV1,
+        description=(
+            "How silver is written, with `keys`, `sequence_by`, `scd` and `delete_when`. "
+            "With no keys, it is append-only."
+        ),
+    )
 
     def path_in(self, env: str) -> str:
         # Only `{env}`, because any other braces in a path are a glob for `read_files`.
         return self.path.replace("{env}", env)
 
 
-def load(domain: str, file: Path) -> Source:
-    config = yaml.safe_load(file.read_text())
-    silver = config.get("silver", {})
-    return Source(
-        domain=domain,
-        name=file.stem,
-        path=config["path"],
-        format=config["format"],
-        silver=Silver(
-            keys=tuple(silver.get("keys", ())),
-            sequence_by=silver.get("sequence_by"),
-            scd=silver.get("scd", 1),
-            delete_when=silver.get("delete_when"),
-        ),
-    )
+VERSIONS: dict[int, type[BaseModel]] = {1: SourceV1}
+Source = SourceV1
+
+# `UPGRADES[n]` turns version n into version n + 1.
+UPGRADES: dict[int, Callable[[Any], BaseModel]] = {}
+
+
+def problems(root: Path, folder: Path, sources: list[Source]) -> list[Diagnostic]:
+    """None: a Source has no files beside its config, so its fields are all there is to check."""
+    return []
 
 
 def generate(source: Source, path: str, bronze: str, silver: str) -> str:
@@ -114,7 +139,8 @@ FROM STREAM read_files('{path}', format => '{source.format}');
 
 
 def _silver(source: Source, bronze: str, silver: str) -> str:
-    if not source.silver.keys:
+    keys = source.silver.keys
+    if not keys:
         return f"""CREATE OR REFRESH STREAMING TABLE {silver}
 AS SELECT *
 FROM STREAM({bronze});
@@ -126,7 +152,7 @@ FROM STREAM({bronze});
 
 CREATE FLOW upsert_{source.name} AS AUTO CDC INTO {silver}
 FROM STREAM({bronze})
-KEYS ({", ".join(source.silver.keys)})
+KEYS ({", ".join(keys)})
 {delete}SEQUENCE BY {source.silver.sequence_by}
 STORED AS SCD TYPE {source.silver.scd};
 """

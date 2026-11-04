@@ -10,9 +10,9 @@ def check(project: Project) -> list[Diagnostic]:
     known = _tables(project)
     diagnostics = []
     for model in project.models:
-        file = model.file.relative_to(project.root).as_posix()
+        file = model.sql_file.relative_to(project.root).as_posix()
         try:
-            query = sql.parse(model.sql)
+            query = sql.parse(model.query)
         except sql.Unparseable as failure:
             diagnostics.append(_unparseable(file, failure))
             continue
@@ -57,7 +57,7 @@ def _seeds_named_like_sources(project: Project) -> list[Diagnostic]:
     return [
         error(
             "MSN202",
-            seed.file.relative_to(project.root).as_posix(),
+            seed.config_file.relative_to(project.root).as_posix(),
             f"{seed.domain}.{silver}.{seed.name} is both a Seed and a Source.",
             "Rename the Seed or the Source, so each has its own table.",
         )

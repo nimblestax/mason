@@ -1,15 +1,14 @@
 """The Platform Contract: `mason.platform.yaml`."""
 
 from collections.abc import Callable
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from pydantic_core import PydanticCustomError
+
+from mason.kinds.base import STRICT, ExactInteger, unique
 
 FILE_NAME = "mason.platform.yaml"
 KIND = "platform"
-
-STRICT = ConfigDict(extra="forbid", frozen=True, strict=True)
 
 
 class Environment(BaseModel):
@@ -50,7 +49,9 @@ class PlatformV1(BaseModel):
     model_config = ConfigDict(**STRICT, title="Mason Platform Contract")
 
     kind: Literal["platform"] = Field(description="The Kind of this file.")
-    version: Literal[1] = Field(description="The schema version of this Kind.")
+    version: Annotated[Literal[1], ExactInteger] = Field(
+        description="The schema version of this Kind."
+    )
     name: str = Field(min_length=1, description="The project's name.")
     environments: dict[str, Environment] = Field(
         min_length=1, description="Settings per Environment."
@@ -61,23 +62,10 @@ class PlatformV1(BaseModel):
         description="The Domains, one folder each under `domains/`.",
     )
 
-    @field_validator("version", mode="before")
-    @classmethod
-    def _version_is_an_integer(cls, value: Any) -> Any:
-        # Strict mode still lets `true` through for `Literal[1]`, because `True == 1` in Python.
-        if type(value) is not int:
-            raise PydanticCustomError("int_type", "Input should be a valid integer")
-        return value
-
     @field_validator("domains")
     @classmethod
     def _domains_are_unique(cls, domains: list[str]) -> list[str]:
-        repeated = sorted({domain for domain in domains if domains.count(domain) > 1})
-        if repeated:
-            raise PydanticCustomError(
-                "unique_items", "Each Domain may appear once: {repeated}", {"repeated": repeated}
-            )
-        return domains
+        return unique(domains, "Domain")
 
     @property
     def hosts(self) -> dict[str, str]:

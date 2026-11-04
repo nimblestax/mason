@@ -3,44 +3,18 @@
 import csv
 import re
 from collections.abc import Callable
-from dataclasses import dataclass
 from datetime import date, datetime
 from functools import partial
 from pathlib import Path
+from typing import Annotated, Any, Literal
 
-import yaml
+from pydantic import BaseModel, ConfigDict, Field
 
 from mason.diagnostics import Diagnostic, error
+from mason.kinds.base import STRICT, ExactInteger, InDomain
 
 KIND = "seed"
-SCHEMAS = {
-    1: {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "title": "Mason Seed",
-        "description": "Small reference data kept in Git and fully replaced on each deploy.",
-        "type": "object",
-        "required": ["kind", "version", "file", "columns"],
-        "additionalProperties": False,
-        "properties": {
-            "kind": {"const": "seed", "description": "The Kind of this file."},
-            "version": {"const": 1, "description": "The schema version of this Kind."},
-            "file": {
-                "type": "string",
-                "pattern": "^[^/\\\\]+\\.csv$",
-                "description": "The data file, in the same folder as this file.",
-            },
-            "columns": {
-                "type": "object",
-                "minProperties": 1,
-                "propertyNames": {"pattern": "^[A-Za-z_][A-Za-z0-9_]*$"},
-                "additionalProperties": {"type": "string"},
-                "description": (
-                    "Each column's name and SQL type. An empty value in the file is NULL."
-                ),
-            },
-        },
-    }
-}
+FOLDER = "seeds"
 
 WHOLE_NUMBER = re.compile(r"[+-]?\d{1,19}")
 NUMBER = re.compile(r"[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?")
@@ -50,52 +24,70 @@ DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 TIMESTAMP_NTZ = re.compile(r"\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(\.\d{1,6})?")
 TIMESTAMP = re.compile(TIMESTAMP_NTZ.pattern + r"(Z|[+-]\d{2}:\d{2})?")
 
-
-@dataclass(frozen=True)
-class Seed:
-    domain: str
-    name: str
-    file: Path
-    columns: dict[str, str]
-    rows: tuple[tuple[str | None, ...], ...]
+ColumnName = Annotated[str, Field(pattern=r"^[A-Za-z_][A-Za-z0-9_]*$")]
 
 
-def load(domain: str, file: Path) -> Seed:
-    config = yaml.safe_load(file.read_text())
-    columns = config["columns"]
-    header, rows = _read(file.parent / config["file"])
-    positions = [header.index(name) for name in columns]
-    return Seed(
-        domain=domain,
-        name=file.stem,
-        file=file,
-        columns=columns,
-        rows=tuple(tuple(cells[at] or None for at in positions) for _, cells in rows),
+class SeedV1(InDomain):
+    """Small reference data kept in Git and fully replaced on each deploy."""
+
+    model_config = ConfigDict(**STRICT, title="Mason Seed")
+
+    kind: Literal["seed"] = Field(description="The Kind of this file.")
+    version: Annotated[Literal[1], ExactInteger] = Field(
+        description="The schema version of this Kind."
+    )
+    file: str = Field(
+        pattern=r"^[^/\\]+\.csv$", description="The data file, in the same folder as this file."
+    )
+    columns: dict[ColumnName, str] = Field(
+        min_length=1,
+        # Without it, the schema would let a column name that isn't an identifier through.
+        json_schema_extra={"additionalProperties": False},
+        description="Each column's name and SQL type. An empty value in the file is NULL.",
     )
 
+    @property
+    def data_file(self) -> Path:
+        return self.config_file.parent / self.file
 
-def problems(root: Path, file: Path) -> list[Diagnostic]:
-    """Problems with a Seed's data, for a config file that has already passed its schema."""
-    config = yaml.safe_load(file.read_text())
-    columns = config["columns"]
-    data = file.parent / config["file"]
-    relative_config = file.relative_to(root).as_posix()
-    if not data.is_file():
-        return [_missing_file(relative_config, config["file"])]
-    unsupported = [t for t in columns.values() if not _is_supported(t)]
+    @property
+    def rows(self) -> tuple[tuple[str | None, ...], ...]:
+        """The data in the declared column order, for a Seed whose data has passed its checks."""
+        header, rows = _read(self.data_file)
+        positions = [header.index(name) for name in self.columns]
+        return tuple(tuple(cells[at] or None for at in positions) for _, cells in rows)
+
+
+VERSIONS: dict[int, type[BaseModel]] = {1: SeedV1}
+Seed = SeedV1
+
+# `UPGRADES[n]` turns version n into version n + 1.
+UPGRADES: dict[int, Callable[[Any], BaseModel]] = {}
+
+
+def problems(root: Path, folder: Path, seeds: list[Seed]) -> list[Diagnostic]:
+    """Problems with each Seed's data file."""
+    return [problem for seed in seeds for problem in _data_problems(root, seed)]
+
+
+def _data_problems(root: Path, seed: Seed) -> list[Diagnostic]:
+    relative_config = seed.config_file.relative_to(root).as_posix()
+    if not seed.data_file.is_file():
+        return [_missing_file(relative_config, seed.file)]
+    unsupported = [t for t in seed.columns.values() if not _is_supported(t)]
     if unsupported:
         return [_unsupported_type(relative_config, t) for t in unsupported]
-    relative_data = data.relative_to(root).as_posix()
+    relative_data = seed.data_file.relative_to(root).as_posix()
     try:
-        header, rows = _read(data)
+        header, rows = _read(seed.data_file)
     except (UnicodeDecodeError, csv.Error) as problem:
         return [_unreadable(relative_data, problem)]
-    if sorted(header) != sorted(columns):
-        return [_wrong_header(relative_data, header, list(columns))]
+    if sorted(header) != sorted(seed.columns):
+        return [_wrong_header(relative_data, header, list(seed.columns))]
     return [
         found
         for line, cells in rows
-        for found in _row_problems(relative_data, line, header, cells, columns)
+        for found in _row_problems(relative_data, line, header, cells, seed.columns)
     ]
 
 
@@ -105,9 +97,10 @@ def generate(seed: Seed, target: str) -> str:
         f"  CAST(`{name}` AS {sql_type}) AS `{name}`" for name, sql_type in seed.columns.items()
     )
     aliases = ", ".join(f"`{name}`" for name in seed.columns)
+    found = seed.rows
     no_rows = (None,) * len(seed.columns)
-    rows = ",\n".join(f"  ({', '.join(map(_literal, row))})" for row in seed.rows or (no_rows,))
-    keep = "" if seed.rows else "\nWHERE false"
+    rows = ",\n".join(f"  ({', '.join(map(_literal, row))})" for row in found or (no_rows,))
+    keep = "" if found else "\nWHERE false"
     return f"""CREATE OR REFRESH MATERIALIZED VIEW {target}
 AS SELECT
 {selected}

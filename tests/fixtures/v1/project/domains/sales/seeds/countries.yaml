@@ -1,0 +1,9 @@
+kind: seed
+version: 1
+file: countries.csv
+columns:
+  code: STRING
+  name: STRING
+  vat_rate: DECIMAL(4, 2)
+  joined: DATE
+  active: BOOLEAN

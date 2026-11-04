@@ -1,0 +1,17 @@
+kind: platform
+version: 1
+name: pinned_v1
+environments:
+  dev:
+    host: https://dev.example.cloud.databricks.com
+  prod:
+    host: https://prod.example.cloud.databricks.com
+naming:
+  catalog: "{env}_{domain}"
+  schema: "{layer}"
+  layers:
+    sources: [bronze, silver]
+    models: [gold]
+domains:
+  - sales
+  - finance
