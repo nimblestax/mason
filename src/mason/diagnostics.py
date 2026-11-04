@@ -2,51 +2,12 @@
 
 from dataclasses import asdict, dataclass
 
+from mason.registry import RULES
+
 RULE_FAILURE = 1
 USAGE_OR_ENVIRONMENT = 2
 
 DOCS = "https://github.com/nimblestax/mason-core/blob/main/docs/reference/json-output.md#rule-ids"
-
-# Append only. An ID never changes meaning, and a retired rule stays here so its ID isn't reused.
-RULES = {
-    "MSN101": "missing-kind",
-    "MSN102": "unknown-kind",
-    "MSN103": "missing-version",
-    "MSN104": "unknown-version",
-    "MSN105": "wrong-kind",
-    "MSN106": "invalid-field",
-    "MSN107": "unreadable-config",
-    "MSN108": "sql-without-config",
-    "MSN109": "missing-sql-file",
-    "MSN110": "keys-without-sequence-by",
-    "MSN111": "upsert-field-without-keys",
-    "MSN112": "missing-seed-file",
-    "MSN113": "seed-header-mismatch",
-    "MSN114": "seed-row-mismatch",
-    "MSN115": "unsupported-seed-type",
-    "MSN116": "invalid-expectation",
-    "MSN117": "invalid-name",
-    "MSN118": "invalid-delete-when",
-    "MSN119": "invalid-sequence-by",
-    "MSN120": "duplicate-config-file",
-    "MSN121": "unlisted-domain-folder",
-    "MSN201": "unresolved-logical-name",
-    "MSN202": "duplicate-table",
-    "MSN203": "unparseable-sql",
-    "MSN204": "computed-table-name",
-    "MSN205": "real-table-name",
-    "MSN206": "file-read",
-    "MSN207": "raw-string-placeholder",
-    "MSN208": "model-cycle",
-    "MSN901": "usage-error",
-    "MSN902": "unknown-environment",
-    "MSN903": "databricks-cli-missing",
-    "MSN904": "databricks-command-failed",
-    "MSN905": "unexpected-error",
-    "MSN906": "pipeline-column-not-found",
-    "MSN907": "expectation-failed",
-    "MSN908": "pipeline-failed",
-}
 
 
 @dataclass(frozen=True)
@@ -65,7 +26,7 @@ class Diagnostic:
 
 
 def error(rule: str, file: str, message: str, fix: str, line: int | None = None) -> Diagnostic:
-    return Diagnostic(rule, RULES[rule], "error", file, line, message, fix, DOCS)
+    return Diagnostic(rule, RULES[rule].name, "error", file, line, message, fix, DOCS)
 
 
 class Failure(Exception):

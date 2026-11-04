@@ -68,7 +68,7 @@ Rule IDs are `MSN` plus three digits. An ID never changes meaning, and a retired
 | `MSN104` | `unknown-version` | This Mason doesn't support that `version`. |
 | `MSN105` | `wrong-kind` | A file's `kind` doesn't belong in its location. |
 | `MSN106` | `invalid-field` | A field doesn't match its Kind's schema. |
-| `MSN107` | `unreadable-config` | A config file is missing, isn't valid YAML or isn't a mapping. |
+| `MSN107` | `unreadable-config` | A config file is missing, isn't valid YAML or isn't a mapping, or a Seed's file isn't valid CSV. |
 | `MSN108` | `sql-without-config` | A SQL file has no config file beside it. |
 | `MSN109` | `missing-sql-file` | A model names a SQL file that doesn't exist. |
 | `MSN110` | `keys-without-sequence-by` | A Source's `silver` block has `keys` but no `sequence_by`. |

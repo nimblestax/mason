@@ -1,4 +1,5 @@
 mod dev 'just/dev.just'
+mod docs 'just/docs.just'
 
 # Run every check, exactly as CI does.
 check:

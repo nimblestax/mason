@@ -257,12 +257,12 @@ REGISTERED_RULES = {
 
 
 def test_no_rule_id_is_removed_reused_or_changes_meaning():
-    assert RULES == REGISTERED_RULES
+    assert {code: rule.name for code, rule in RULES.items()} == REGISTERED_RULES
 
 
 def test_rule_ids_are_msn_plus_three_digits_with_one_name_each():
     assert all(re.fullmatch(r"MSN\d{3}", rule) for rule in RULES)
-    assert len(set(RULES.values())) == len(RULES)
+    assert len({rule.name for rule in RULES.values()}) == len(RULES)
 
 
 def test_an_unregistered_rule_can_not_be_reported():
@@ -364,7 +364,7 @@ def test_every_project_rule_reports_a_message_and_a_fix_and_exits_1(
     assert result.exit_code == 1, result.output
     [diagnostic] = json.loads(result.stdout)["diagnostics"]
     assert diagnostic["rule"] == rule
-    assert diagnostic["name"] == RULES[rule]
+    assert diagnostic["name"] == RULES[rule].name
     assert diagnostic["severity"] == "error"
     assert diagnostic["message"]
     assert diagnostic["fix"]
@@ -385,8 +385,8 @@ def test_the_docs_state_every_exit_code_and_every_rule():
     assert "| 0 | Clean" in docs
     assert "| 1 | Rule failures" in docs
     assert "| 2 | Usage or environment error" in docs
-    for rule, name in RULES.items():
-        assert f"| `{rule}` | `{name}` |" in docs
+    for code, rule in RULES.items():
+        assert f"| `{code}` | `{rule.name}` |" in docs
 
 
 def test_help_states_the_exit_codes():
