@@ -12,7 +12,7 @@
 
 Mason brings the software development lifecycle to Databricks pipelines: config-driven pipelines from bronze to gold, reviewed in pull requests, tested, and promoted from dev to prod.
 
-**Status:** early development. Nothing is released, so there's nothing to install yet. The Plan shown on [nimblestax.com](https://nimblestax.com) is illustrative: Mason has no Plan command today.
+**Status:** early development, and below 1.0, so a minor release may need edits to your project. Install it into your project with `uv add --dev mason-databricks`. The Plan shown on [nimblestax.com](https://nimblestax.com) is illustrative: Mason has no Plan command today.
 
 A pipeline is YAML and SQL in your repo. A Source says where data lands:
 
