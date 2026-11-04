@@ -184,3 +184,85 @@ def test_schema_names_the_fields_of_the_silver_block_for_a_person():
 def test_delete_when_is_a_line_only_when_a_condition_is_given():
     assert _delete_when(None) is None
     assert _delete_when("op = 'D'") == "APPLY AS DELETE WHEN op = 'D'"
+
+
+UPSERT = "silver:\n  keys: [order_id]\n  sequence_by: updated_at\n"
+
+
+def test_a_delete_when_that_would_break_the_generated_flow_fails_validation(project: Path):
+    declare_silver(project, UPSERT + "  delete_when: \"op = 'D' SEQUENCE BY x\"\n")
+
+    [diagnostic] = failures(project)
+
+    assert diagnostic["rule"] == "MSN118"
+    assert diagnostic["file"] == SOURCE
+    assert "`silver.delete_when`" in diagnostic["message"]
+
+
+@pytest.mark.parametrize(
+    ("condition", "reason"),
+    [
+        ("op =", "doesn't parse"),
+        ("op = 'D'; DROP TABLE x", "statements"),
+        ("op IN (SELECT op FROM x)", "query"),
+        ("count(op) > 1", "aggregate"),
+        ("row_number() OVER (ORDER BY id) = 1", "window"),
+        ("op = 'D' -- a delete", "comment"),
+        ("op = 'D' deleted", "names its result"),
+    ],
+)
+def test_a_delete_when_that_isnt_one_condition_on_one_row_says_why(
+    project: Path, condition: str, reason: str
+):
+    declare_silver(project, UPSERT + f"  delete_when: {json.dumps(condition)}\n")
+
+    [diagnostic] = failures(project)
+
+    assert diagnostic["rule"] == "MSN118"
+    assert reason in diagnostic["message"]
+    assert diagnostic["fix"]
+
+
+@pytest.mark.parametrize(
+    ("expression", "reason"),
+    [
+        ("updated_at SEQUENCE BY x", "doesn't parse"),
+        ("updated_at, seq", "doesn't parse"),
+        ("updated_at; DROP TABLE x", "statements"),
+        ("(SELECT max(updated_at) FROM x)", "query"),
+        ("max(updated_at)", "aggregate"),
+        ("row_number() OVER (ORDER BY updated_at)", "window"),
+        ("updated_at -- the change time", "comment"),
+        ("updated_at DESC", "names its result"),
+    ],
+)
+def test_a_sequence_by_that_isnt_one_expression_on_one_row_fails_validation(
+    project: Path, expression: str, reason: str
+):
+    declare_silver(
+        project, f"silver:\n  keys: [order_id]\n  sequence_by: {json.dumps(expression)}\n"
+    )
+
+    [diagnostic] = failures(project)
+
+    assert diagnostic["rule"] == "MSN119"
+    assert diagnostic["file"] == SOURCE
+    assert "`silver.sequence_by`" in diagnostic["message"]
+    assert reason in diagnostic["message"]
+
+
+@pytest.mark.parametrize("expression", ["updated_at", "struct(updated_at, seq)", "ts.updated_at"])
+def test_a_sequence_by_may_be_a_column_or_an_expression_on_one_row(project: Path, expression: str):
+    declare_silver(project, f"silver:\n  keys: [order_id]\n  sequence_by: {expression}\n")
+
+    assert f"SEQUENCE BY {expression}\n" in generated(project)
+
+
+@pytest.mark.parametrize("key", ["order id", "order_id)", "upper(order_id)", "1st", "`order_id`"])
+def test_a_key_that_isnt_a_column_name_fails_against_the_schema(project: Path, key: str):
+    declare_silver(project, f"silver:\n  keys: [{json.dumps(key)}]\n  sequence_by: updated_at\n")
+
+    [diagnostic] = failures(project)
+
+    assert diagnostic["rule"] == "MSN106"
+    assert "silver.keys" in diagnostic["message"]

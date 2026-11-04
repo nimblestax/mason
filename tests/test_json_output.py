@@ -232,6 +232,8 @@ REGISTERED_RULES = {
     "MSN114": "seed-row-mismatch",
     "MSN115": "unsupported-seed-type",
     "MSN116": "invalid-expectation",
+    "MSN118": "invalid-delete-when",
+    "MSN119": "invalid-sequence-by",
     "MSN201": "unresolved-logical-name",
     "MSN202": "duplicate-table",
     "MSN203": "unparseable-sql",
@@ -306,6 +308,17 @@ INVALID_PROJECTS = {
         SOURCE,
         "format: json\n",
         "format: json\nsilver:\n  expectations:\n    - name: bad\n      expect: amount >\n",
+    ),
+    "MSN118": replacing(
+        SOURCE,
+        "format: json\n",
+        "format: json\nsilver:\n  keys: [order_id]\n  sequence_by: updated_at\n"
+        "  delete_when: op =\n",
+    ),
+    "MSN119": replacing(
+        SOURCE,
+        "format: json\n",
+        "format: json\nsilver:\n  keys: [order_id]\n  sequence_by: updated_at DESC\n",
     ),
     "MSN201": lambda project: (project / f"{MODEL}.sql").write_text("SELECT * FROM a.b.c"),
     "MSN202": seed("code: STRING", "code\nAU\n", name="orders"),

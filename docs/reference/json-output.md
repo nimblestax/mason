@@ -77,7 +77,9 @@ Rule IDs are `MSN` plus three digits. An ID never changes meaning, and a retired
 | `MSN113` | `seed-header-mismatch` | The first line of a Seed's file doesn't name each declared column once. |
 | `MSN114` | `seed-row-mismatch` | A row of a Seed's file has the wrong number of values, or a value that doesn't fit its column's type. |
 | `MSN115` | `unsupported-seed-type` | A Seed's column has a type Mason can't check values against. |
-| `MSN116` | `invalid-expectation` | An Expectation's `expect` isn't one SQL condition on one row: it doesn't parse, or it holds a query, an aggregate, a window function or a comment. |
+| `MSN116` | `invalid-expectation` | An Expectation's `expect` isn't one SQL condition on one row: it doesn't parse, or it holds a query, an aggregate, a window function, a comment or an alias. |
+| `MSN118` | `invalid-delete-when` | A Source's `silver.delete_when` isn't one SQL condition on one row, for the same reasons as `MSN116`. |
+| `MSN119` | `invalid-sequence-by` | A Source's `silver.sequence_by` isn't one SQL expression on one row, such as `updated_at` or `struct(updated_at, seq)`: it doesn't parse, or it holds a query, an aggregate, a window function, a comment or an alias. |
 | `MSN201` | `unresolved-logical-name` | SQL reads a table that isn't in the project. |
 | `MSN202` | `duplicate-table` | Two tables in one Domain would share a name: a Seed and a Source, or a table and a Source's Quarantine table. |
 | `MSN203` | `unparseable-sql` | A Gold Model's SQL doesn't parse as one Databricks SQL query. |
