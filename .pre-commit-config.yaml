@@ -3,19 +3,19 @@ repos:
     hooks:
       - id: black
         name: black
-        entry: uv run black --check src tests
+        entry: uv run black --check src tests scripts
         language: system
         types: [python]
         pass_filenames: false
       - id: ruff
         name: ruff
-        entry: uv run ruff check src tests
+        entry: uv run ruff check src tests scripts
         language: system
         types: [python]
         pass_filenames: false
       - id: ty
         name: ty
-        entry: uv run ty check src tests
+        entry: uv run ty check src tests scripts
         language: system
         types: [python]
         pass_filenames: false
