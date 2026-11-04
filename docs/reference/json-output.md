@@ -78,6 +78,7 @@ Rule IDs are `MSN` plus three digits. An ID never changes meaning, and a retired
 | `MSN114` | `seed-row-mismatch` | A row of a Seed's file has the wrong number of values, or a value that doesn't fit its column's type. |
 | `MSN115` | `unsupported-seed-type` | A Seed's column has a type Mason can't check values against. |
 | `MSN116` | `invalid-expectation` | An Expectation's `expect` isn't one SQL condition on one row: it doesn't parse, or it holds a query, an aggregate, a window function or a comment. |
+| `MSN117` | `invalid-name` | A config file's name isn't an identifier, so the table named after it can't be written in SQL: it must hold only letters, digits and underscores, and not start with a digit. |
 | `MSN201` | `unresolved-logical-name` | SQL reads a table that isn't in the project. |
 | `MSN202` | `duplicate-table` | Two tables in one Domain would share a name: a Seed and a Source, or a table and a Source's Quarantine table. |
 | `MSN203` | `unparseable-sql` | A Gold Model's SQL doesn't parse as one Databricks SQL query. |
@@ -90,4 +91,4 @@ Rule IDs are `MSN` plus three digits. An ID never changes meaning, and a retired
 | `MSN904` | `databricks-command-failed` | A Databricks CLI command failed. |
 | `MSN905` | `unexpected-error` | Mason stopped on something it didn't expect, with a traceback on stderr. |
 
-`mason schema <unknown kind>` reports `MSN102` and exits 2, because the mistake is on the command line. `MSN101` to `MSN116` and `MSN201` to `MSN206` exit 1 when found in a project.
+`mason schema <unknown kind>` reports `MSN102` and exits 2, because the mistake is on the command line. `MSN101` to `MSN117` and `MSN201` to `MSN206` exit 1 when found in a project.

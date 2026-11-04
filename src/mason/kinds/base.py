@@ -1,12 +1,16 @@
 """What every Kind's models share."""
 
 from pathlib import Path
-from typing import Any, Self
+from typing import Annotated, Any, Self
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, PrivateAttr
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, PrivateAttr
 from pydantic_core import PydanticCustomError
 
 STRICT = ConfigDict(extra="forbid", frozen=True, strict=True)
+
+# Mason writes table, column and catalog names into SQL unquoted, so each must be an identifier.
+IDENTIFIER = r"^[A-Za-z_][A-Za-z0-9_]*$"
+Identifier = Annotated[str, Field(pattern=IDENTIFIER)]
 
 
 def _exact_integer(value: Any) -> Any:

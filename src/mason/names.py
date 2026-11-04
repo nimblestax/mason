@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from mason.kinds.source import Source
 from mason.load.project import Project
+from mason.statements import escaped
 
 PLACEHOLDER = re.compile(r"\$\{(\w+)\}")
 
@@ -53,7 +54,8 @@ def settings(project: Project, env: str) -> dict[str, str]:
             values[catalog_setting(domain, layer)] = platform.naming.catalog_pattern.format(**parts)
             values[schema_setting(domain, layer)] = platform.naming.schema_pattern.format(**parts)
     for source in project.sources:
-        values[_path_setting(source)] = source.path_in(env)
+        # Escaped, because generated code substitutes it between the quotes of a string literal.
+        values[_path_setting(source)] = escaped(source.path_in(env))
     return values
 
 

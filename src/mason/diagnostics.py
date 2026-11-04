@@ -25,6 +25,7 @@ RULES = {
     "MSN114": "seed-row-mismatch",
     "MSN115": "unsupported-seed-type",
     "MSN116": "invalid-expectation",
+    "MSN117": "invalid-name",
     "MSN201": "unresolved-logical-name",
     "MSN202": "duplicate-table",
     "MSN203": "unparseable-sql",

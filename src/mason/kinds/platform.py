@@ -5,7 +5,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from mason.kinds.base import STRICT, ExactInteger, unique
+from mason.kinds.base import STRICT, ExactInteger, Identifier, unique
 
 FILE_NAME = "mason.platform.yaml"
 KIND = "platform"
@@ -57,7 +57,7 @@ class PlatformV1(BaseModel):
         min_length=1, description="Settings per Environment."
     )
     naming: Naming = Field(description="The catalog and schema patterns, and the Layers.")
-    domains: list[str] = Field(
+    domains: list[Identifier] = Field(
         json_schema_extra={"uniqueItems": True},
         description="The Domains, one folder each under `domains/`.",
     )
