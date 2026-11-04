@@ -42,10 +42,12 @@ class Naming(BaseModel):
 
     # Aliases, because `schema` is taken on every Pydantic model.
     catalog_pattern: str = Field(
-        alias="catalog", description="The catalog pattern, built from {env}, {domain} and {layer}."
+        alias="catalog",
+        description="The catalog pattern, built from `{env}`, `{domain}` and `{layer}`.",
     )
     schema_pattern: str = Field(
-        alias="schema", description="The schema pattern, built from {env}, {domain} and {layer}."
+        alias="schema",
+        description="The schema pattern, built from `{env}`, `{domain}` and `{layer}`.",
     )
     layers: Layers = Field(description="The source and model Layers.")
 

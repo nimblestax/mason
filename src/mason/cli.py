@@ -18,7 +18,7 @@ from mason.check import rules
 from mason.deploy import deploy as delivery
 from mason.deploy.databricks import DatabricksCli
 from mason.diagnostics import USAGE_OR_ENVIRONMENT, Diagnostic, Failure, error
-from mason.kinds import KINDS, json_schemas, platform
+from mason.kinds import KINDS, latest_schema, platform
 from mason.load import config, project
 
 EXIT_CODES = "Exit codes: 0 clean, 1 rule failures, 2 usage or environment error."
@@ -157,7 +157,7 @@ def schema(kind: Annotated[str, typer.Argument(help="The Kind to describe.")]) -
     """Print a Kind's fields from the installed Mason. Needs no project."""
     if kind not in KINDS:
         raise Failure([config.unknown_kind(kind, "")], USAGE_OR_ENVIRONMENT)
-    version, json_schema = max(json_schemas(kind).items())
+    version, json_schema = latest_schema(kind)
     result = {"kind": kind, "version": version, "json_schema": json_schema}
     return Outcome(output.fields(kind, version, json_schema), result)
 
