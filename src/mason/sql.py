@@ -1,5 +1,6 @@
 """Reads Logical Names out of Gold Model SQL and rewrites them, keeping the author's formatting."""
 
+import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
@@ -26,6 +27,10 @@ GENERATORS = {
 }
 # Formats that read files straight from a path, as in parquet.`/Volumes/...`.
 FILE_FORMATS = {"parquet", "json", "csv", "delta", "orc", "avro", "text", "binaryfile"}
+# `${`, with the backslashes before it. An odd number escapes the `$`.
+PLACEHOLDER_START = re.compile(r"(\\*)\$\{")
+# How generated code writes `$`, so the pipeline never reads the author's text as a placeholder.
+ESCAPED_DOLLAR = "\\u0024"
 
 
 @dataclass(frozen=True)
@@ -44,6 +49,7 @@ class Query:
     unqualified: list[Found] = field(default_factory=list)
     computed: list[Found] = field(default_factory=list)
     file_reads: list[Found] = field(default_factory=list)
+    raw_placeholders: list[Found] = field(default_factory=list)
 
 
 class Unparseable(Exception):
@@ -59,7 +65,7 @@ def parse(sql: str) -> Query:
     """Fails closed: anything that might be a read but isn't a Logical Name is reported."""
     tree = _one_statement(sql)
     ctes = _cte_references(tree)
-    query = Query()
+    query = Query(raw_placeholders=_raw_placeholders(sql))
     for node in tree.find_all(exp.Table, exp.Stream):
         # A hint only steers the plan: it can't read a table, and one naming nothing is ignored.
         if any(node is cte for cte in ctes) or node.find_ancestor(exp.Hint):
@@ -203,3 +209,44 @@ def _three_part_names(sql: str, offset: int = 0) -> list[tuple[int, int, Logical
 
 def _is_three_part(window: list[Token]) -> bool:
     return window[1].token_type == TokenType.DOT and window[3].token_type == TokenType.DOT
+
+
+def escape_placeholders(sql: str) -> str:
+    """Writes each `${` in a string or comment as `\\u0024{`, so the pipeline leaves it alone.
+
+    Each string keeps its value. A raw string can't hold an escape, so it's left as written.
+    """
+    pieces: list[str] = []
+    position = 0
+    for token in sqlglot.tokenize(sql, dialect=DIALECT):
+        # Between tokens is only whitespace and comments.
+        pieces.append(_in_comment(sql[position : token.start]))
+        text = sql[token.start : token.end + 1]
+        if token.token_type == TokenType.STRING:
+            text = PLACEHOLDER_START.sub(_escaped, text)
+        elif token.token_type == TokenType.HINT:
+            text = _in_comment(text)
+        pieces.append(text)
+        position = token.end + 1
+    return "".join(pieces) + _in_comment(sql[position:])
+
+
+def _in_comment(text: str) -> str:
+    return text.replace("${", ESCAPED_DOLLAR + "{")
+
+
+def _escaped(match: re.Match[str]) -> str:
+    backslashes = match.group(1)
+    # `\$` is already `$`, so its backslash goes, or the string would gain one.
+    if len(backslashes) % 2:
+        backslashes = backslashes[:-1]
+    return backslashes + ESCAPED_DOLLAR + "{"
+
+
+def _raw_placeholders(sql: str) -> list[Found]:
+    """Raw strings holding `${`, which the pipeline would read as a placeholder."""
+    return [
+        Found(sql[token.start : token.end + 1], sql.count("\n", 0, token.start) + 1)
+        for token in sqlglot.tokenize(sql, dialect=DIALECT)
+        if token.token_type == TokenType.RAW_STRING and "${" in token.text
+    ]

@@ -4,11 +4,14 @@ from collections.abc import Callable
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic_core import PydanticCustomError
 
 from mason.kinds.base import STRICT, ExactInteger, Identifier, unique
 
 FILE_NAME = "mason.platform.yaml"
 KIND = "platform"
+
+PLACEHOLDERS = ("{env}", "{domain}", "{layer}")
 
 
 class Environment(BaseModel):
@@ -38,9 +41,28 @@ class Naming(BaseModel):
     model_config = STRICT
 
     # Aliases, because `schema` is taken on every Pydantic model.
-    catalog_pattern: str = Field(alias="catalog", description="The catalog pattern.")
-    schema_pattern: str = Field(alias="schema", description="The schema pattern.")
+    catalog_pattern: str = Field(
+        alias="catalog", description="The catalog pattern, built from {env}, {domain} and {layer}."
+    )
+    schema_pattern: str = Field(
+        alias="schema", description="The schema pattern, built from {env}, {domain} and {layer}."
+    )
     layers: Layers = Field(description="The source and model Layers.")
+
+    @field_validator("catalog_pattern", "schema_pattern")
+    @classmethod
+    def _only_known_placeholders(cls, pattern: str) -> str:
+        rest = pattern
+        for placeholder in PLACEHOLDERS:
+            rest = rest.replace(placeholder, "")
+        if "{" in rest or "}" in rest:
+            # The values go in as context, because the message template reads its own braces.
+            raise PydanticCustomError(
+                "unknown_placeholder",
+                "`{pattern}` may hold only {allowed} in braces.",
+                {"pattern": pattern, "allowed": "{env}, {domain} and {layer}"},
+            )
+        return pattern
 
 
 class PlatformV1(BaseModel):

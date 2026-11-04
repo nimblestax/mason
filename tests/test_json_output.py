@@ -233,12 +233,18 @@ REGISTERED_RULES = {
     "MSN115": "unsupported-seed-type",
     "MSN116": "invalid-expectation",
     "MSN117": "invalid-name",
+    "MSN118": "invalid-delete-when",
+    "MSN119": "invalid-sequence-by",
+    "MSN120": "duplicate-config-file",
+    "MSN121": "unlisted-domain-folder",
     "MSN201": "unresolved-logical-name",
     "MSN202": "duplicate-table",
     "MSN203": "unparseable-sql",
     "MSN204": "computed-table-name",
     "MSN205": "real-table-name",
     "MSN206": "file-read",
+    "MSN207": "raw-string-placeholder",
+    "MSN208": "model-cycle",
     "MSN901": "usage-error",
     "MSN902": "unknown-environment",
     "MSN903": "databricks-cli-missing",
@@ -308,6 +314,21 @@ INVALID_PROJECTS = {
         "format: json\nsilver:\n  expectations:\n    - name: bad\n      expect: amount >\n",
     ),
     "MSN117": seed("code: STRING", "code\nAU\n", name="vat-rates"),
+    "MSN118": replacing(
+        SOURCE,
+        "format: json\n",
+        "format: json\nsilver:\n  keys: [order_id]\n  sequence_by: updated_at\n"
+        "  delete_when: op =\n",
+    ),
+    "MSN119": replacing(
+        SOURCE,
+        "format: json\n",
+        "format: json\nsilver:\n  keys: [order_id]\n  sequence_by: updated_at DESC\n",
+    ),
+    "MSN120": lambda project: (project / SOURCE.replace(".yaml", ".yml")).write_text(
+        (project / SOURCE).read_text()
+    ),
+    "MSN121": lambda project: (project / "domains/hr").mkdir(),
     "MSN201": lambda project: (project / f"{MODEL}.sql").write_text("SELECT * FROM a.b.c"),
     "MSN202": seed("code: STRING", "code\nAU\n", name="orders"),
     "MSN203": lambda project: (project / f"{MODEL}.sql").write_text("SELECT FROM WHERE"),
@@ -319,6 +340,12 @@ INVALID_PROJECTS = {
     ),
     "MSN206": lambda project: (project / f"{MODEL}.sql").write_text(
         "SELECT * FROM read_files('/Volumes/x')"
+    ),
+    "MSN207": lambda project: (project / f"{MODEL}.sql").write_text(
+        "SELECT r'${env}' AS x FROM sales.silver.orders"
+    ),
+    "MSN208": lambda project: (project / f"{MODEL}.sql").write_text(
+        "SELECT * FROM sales.gold.fct_orders"
     ),
 }
 

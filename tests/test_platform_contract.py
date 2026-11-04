@@ -1,6 +1,7 @@
 """The Platform Contract, described once by a Pydantic model."""
 
 import json
+import shutil
 from pathlib import Path
 from typing import Literal
 
@@ -138,3 +139,37 @@ def test_a_version_1_contract_is_upgraded_to_the_latest_version(project: Path, m
     upgraded = config.load(project, project / PLATFORM, platform.KIND, PlatformV2)
 
     assert upgraded == PlatformV2(kind="platform", version=2, project=written["name"])
+
+
+@pytest.mark.parametrize(
+    ("new", "field"),
+    [
+        ('  catalog: "{env}_{team}"', "naming.catalog"),
+        ('  catalog: "{env}_{0}"', "naming.catalog"),
+        ('  catalog: "{env}_{domain"', "naming.catalog"),
+        ('  schema: "{layer}_}"', "naming.schema"),
+        ('  schema: "{layer!r}"', "naming.schema"),
+    ],
+)
+def test_a_pattern_with_anything_but_known_placeholders_fails_with_an_msn106(
+    project: Path, new: str, field: str
+):
+    old = '  catalog: "{env}_{domain}"' if "catalog" in new else '  schema: "{layer}"'
+    edit(project, old, new)
+
+    [diagnostic] = failures(project)
+
+    assert diagnostic["rule"] == "MSN106"
+    assert diagnostic["message"].startswith(f"{field}: ")
+    assert "{env}, {domain} and {layer}" in diagnostic["message"]
+
+
+def test_a_project_with_no_domains_compiles_to_a_package_with_no_pipelines(project: Path):
+    edit(project, "domains:\n  - sales\n", "domains: []\n")
+    shutil.rmtree(project / "domains")
+
+    result = mason(project, "compile")
+
+    assert result.exit_code == 0, result.output
+    bundle = yaml.safe_load((project / "build/databricks.yml").read_text())
+    assert bundle["resources"]["pipelines"] == {}

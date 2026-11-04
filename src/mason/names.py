@@ -74,9 +74,12 @@ def logical_name_for(project: Project, real: LogicalName) -> LogicalName | None:
 
 
 def resolve(generated: str, project: Project, env: str) -> str:
-    """Generated code with its placeholders replaced by one Environment's real names."""
+    """Generated code with its placeholders replaced by one Environment's real names.
+
+    `${word}` that names no setting is the author's own text, so it stays as written.
+    """
     values = settings(project, env)
-    return PLACEHOLDER.sub(lambda match: values[match.group(1)], generated)
+    return PLACEHOLDER.sub(lambda match: values.get(match.group(1), match.group(0)), generated)
 
 
 def _path_setting(source: Source) -> str:
