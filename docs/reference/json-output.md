@@ -86,6 +86,7 @@ Rule IDs are `MSN` plus three digits. An ID never changes meaning, and a retired
 | `MSN204` | `computed-table-name` | SQL builds a table name when it runs, such as `IDENTIFIER(...)`, so Mason can't see what it reads. |
 | `MSN205` | `real-table-name` | SQL reads a real table name, which names one Environment, instead of its Logical Name. |
 | `MSN206` | `file-read` | A Gold Model reads files or external data, such as `read_files(...)` or ``parquet.`/path` ``, instead of a table. |
+| `MSN207` | `raw-string-placeholder` | A raw string in a Gold Model's SQL, such as `r'${env}'`, holds `${`. The pipeline replaces `${name}` with a setting's value, even inside a string. Mason escapes `${` in ordinary strings and comments, but a raw string can't hold the escape. |
 | `MSN208` | `model-cycle` | Gold Models read themselves, or each other in a loop, so none of them can run first. |
 | `MSN901` | `usage-error` | The command line is wrong. |
 | `MSN902` | `unknown-environment` | `--env` isn't an Environment in the project. |

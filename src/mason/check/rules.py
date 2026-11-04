@@ -23,6 +23,7 @@ def check(project: Project) -> list[Diagnostic]:
         diagnostics += [_unqualified(file, name) for name in query.unqualified]
         diagnostics += [_computed(file, computed) for computed in query.computed]
         diagnostics += [_file_read(file, found) for found in query.file_reads]
+        diagnostics += [_raw_placeholder(file, found) for found in query.raw_placeholders]
     return (
         diagnostics
         + _cycles(project, reads)
@@ -179,6 +180,17 @@ def _file_read(file: str, found: sql.Found) -> Diagnostic:
         " so Mason can't check it or point it at each Environment.",
         "A Gold Model reads tables. Declare a Source for these files"
         " and read its silver table by Logical Name.",
+        found.line,
+    )
+
+
+def _raw_placeholder(file: str, found: sql.Found) -> Diagnostic:
+    return error(
+        "MSN207",
+        file,
+        f"{found.text} holds `${{`, so the pipeline could replace it with a setting's value,"
+        " and a raw string can't hold the escape that stops it.",
+        "Write it as an ordinary string, doubling each backslash, and Mason escapes the `${`.",
         found.line,
     )
 
