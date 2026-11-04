@@ -61,7 +61,7 @@ MSN201 domains/sales/models/fct_orders.sql: sales.silver.ordrs isn't a table in 
 - `mason compile` writes generated code, or prints it for one Environment.
 - `mason deploy` deploys to an Environment and refreshes its tables.
 - `mason schema` prints any Kind's fields.
-- Every command has [`--json` output](docs/json-output.md), rule IDs and fixed exit codes.
+- Every command has [`--json` output](docs/reference/json-output.md), rule IDs and fixed exit codes.
 
 ## The Nimblestax Way
 

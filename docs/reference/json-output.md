@@ -1,4 +1,9 @@
-# JSON output
+---
+title: JSON output
+description: The envelope every command prints with --json, its exit codes and its rule IDs.
+redirects:
+  - json-output
+---
 
 Every `mason` command accepts `--json`. It prints one envelope on stdout and nothing else there. Logs, including the Databricks CLI's output, go to stderr.
 
@@ -17,7 +22,7 @@ Every `mason` command accepts `--json`. It prints one envelope on stdout and not
       "line": null,
       "message": "sales.silver.nope isn't a table in this project.",
       "fix": "Declare a Source, Seed or Gold Model with this name, or correct the Logical Name.",
-      "docs": "https://github.com/nimblestax/mason-core/blob/main/docs/json-output.md#rule-ids"
+      "docs": "https://github.com/nimblestax/mason-core/blob/main/docs/reference/json-output.md#rule-ids"
     }
   ]
 }

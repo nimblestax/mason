@@ -5,7 +5,7 @@ from dataclasses import asdict, dataclass
 RULE_FAILURE = 1
 USAGE_OR_ENVIRONMENT = 2
 
-DOCS = "https://github.com/nimblestax/mason-core/blob/main/docs/json-output.md#rule-ids"
+DOCS = "https://github.com/nimblestax/mason-core/blob/main/docs/reference/json-output.md#rule-ids"
 
 # Append only. An ID never changes meaning, and a retired rule stays here so its ID isn't reused.
 RULES = {

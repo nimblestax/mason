@@ -341,7 +341,7 @@ def test_a_new_rule_must_be_tested_here():
 
 
 def test_the_docs_state_every_exit_code_and_every_rule():
-    docs = (Path(__file__).parent.parent / "docs/json-output.md").read_text()
+    docs = (Path(__file__).parent.parent / "docs/reference/json-output.md").read_text()
 
     assert "| 0 | Clean" in docs
     assert "| 1 | Rule failures" in docs
