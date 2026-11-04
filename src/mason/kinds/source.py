@@ -79,7 +79,10 @@ class SilverV1(BaseModel):
     )
     expectations: list[ExpectationV1] = Field(
         default_factory=list,
-        description="Row-level rules each row of silver is checked against, in every Environment.",
+        description=(
+            "Row-level rules each row of silver is checked against, in every Environment."
+            " On an upsert, a row where `delete_when` is true skips them."
+        ),
     )
 
     @property
@@ -194,7 +197,8 @@ class SourceV1(InDomain):
         default_factory=SilverV1,
         description=(
             "How silver is written, with `keys`, `sequence_by`, `scd` and `delete_when`. "
-            "With no keys, it is append-only. `expectations` lists the rules each row must meet."
+            "With no keys, it is append-only. `expectations` lists the rules each row must meet,"
+            " which a delete skips."
         ),
     )
 
@@ -223,9 +227,8 @@ def problems(root: Path, folder: Path, sources: list[Source]) -> list[Diagnostic
 def generate(source: Source, path: str, bronze: str, silver: str, quarantine: str) -> str:
     """Bronze, the statements that write silver, then any Quarantine, with a blank line between."""
     statements = [_bronze(source, path, bronze), *_silver(source, bronze, silver)]
-    held_back = source.silver.quarantining
-    if held_back:
-        statements.append(_quarantine(held_back, bronze, quarantine))
+    if source.silver.quarantining:
+        statements.append(_quarantine(source, bronze, quarantine))
     return "\n\n".join(statements) + "\n"
 
 
@@ -254,28 +257,31 @@ def _silver(source: Source, bronze: str, silver: str) -> list[str]:
 
 def _passing(head: str, source: Source, bronze: str) -> str:
     """The rows of bronze that pass every quarantining rule, checked against the rest."""
+    held_back = source.silver.quarantining
     return statement(
         *_checked(head, source),
         "AS SELECT *",
         f"FROM STREAM({bronze})",
-        _where_passed(source.silver.quarantining),
+        f"WHERE {_passes(source, held_back)}" if held_back else None,
     )
 
 
 def _checked(head: str, source: Source) -> list[str]:
     """A dataset's first line, with Lakeflow constraints for the rules that warn or fail."""
     constraints = [
-        _constraint(rule) for rule in source.silver.expectations if rule.action != "quarantine"
+        _constraint(source, rule)
+        for rule in source.silver.expectations
+        if rule.action != "quarantine"
     ]
     if not constraints:
         return [head]
     return [f"{head} (", listed(constraints), ")"]
 
 
-def _constraint(rule: ExpectationV1) -> str:
+def _constraint(source: Source, rule: ExpectationV1) -> str:
     # With no ON VIOLATION, Lakeflow keeps the row and counts it in the table's metrics.
     violation = " ON VIOLATION FAIL UPDATE" if rule.action == "fail" else ""
-    return f"CONSTRAINT {rule.name} EXPECT ({_met(rule)}){violation}"
+    return f"CONSTRAINT {rule.name} EXPECT ({_passes(source, [rule])}){violation}"
 
 
 def _met(rule: ExpectationV1) -> str:
@@ -283,16 +289,24 @@ def _met(rule: ExpectationV1) -> str:
     return f"coalesce({rule.expect}, false)"
 
 
-def _passed(rules: list[ExpectationV1]) -> str:
-    return " AND ".join(_met(rule) for rule in rules)
+def _passes(source: Source, rules: list[ExpectationV1]) -> str:
+    """True when a row meets every rule, or is a delete.
+
+    A delete skips every Expectation. It often carries only its key, so a rule on any other
+    column would quarantine it, and silver would keep a row the source deleted.
+    """
+    met = " AND ".join(_met(rule) for rule in rules)
+    delete_when = source.silver.delete_when
+    if not delete_when:
+        return met
+    if len(rules) > 1:
+        met = f"({met})"
+    return f"coalesce({delete_when}, false) OR {met}"
 
 
-def _where_passed(rules: list[ExpectationV1]) -> str | None:
-    return f"WHERE {_passed(rules)}" if rules else None
-
-
-def _quarantine(rules: list[ExpectationV1], bronze: str, quarantine: str) -> str:
+def _quarantine(source: Source, bronze: str, quarantine: str) -> str:
     """Every row silver turns away, with the name of each rule it failed as the reason."""
+    rules = source.silver.quarantining
     reasons = [f"  IF({_met(rule)}, NULL, '{rule.name}')" for rule in rules]
     return statement(
         f"CREATE OR REFRESH STREAMING TABLE {quarantine}",
@@ -302,7 +316,7 @@ def _quarantine(rules: list[ExpectationV1], bronze: str, quarantine: str) -> str
         listed(reasons),
         "  ) AS _quarantine_reason",
         f"FROM STREAM({bronze})",
-        f"WHERE NOT ({_passed(rules)})",
+        f"WHERE NOT ({_passes(source, rules)})",
     )
 
 
