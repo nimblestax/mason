@@ -5,10 +5,10 @@ from datetime import datetime
 from mason.build import bundle, compiler
 from mason.check import rules
 from mason.deploy.databricks import Workspace, WorkspaceError
-from mason.diagnostics import USAGE_OR_ENVIRONMENT, Diagnostic, Failure, error
+from mason.diagnostics import DOCS_ROOT, USAGE_OR_ENVIRONMENT, Diagnostic, Failure, error
 from mason.load.project import Project
 
-RECOVERY_GUIDE = "docs/guides/recover-from-a-failed-refresh.md"
+RECOVERY_GUIDE = f"{DOCS_ROOT}/guides/recover-from-a-failed-refresh.md"
 
 
 class InvalidProject(Failure):
@@ -27,12 +27,21 @@ def deploy(project: Project, env: str, workspace: Workspace) -> None:
     except WorkspaceError as failure:
         try:
             errors = workspace.pipeline_errors(package, env, started)
-        except WorkspaceError:
-            errors = []
+        except WorkspaceError as lookup:
+            raise _unexplained(failure, lookup) from failure
         if not errors:
             raise failure
         found = [refresh_failure(message) for message in errors]
         raise Failure(found, USAGE_OR_ENVIRONMENT) from failure
+
+
+def _unexplained(failure: WorkspaceError, lookup: WorkspaceError) -> WorkspaceError:
+    """The refresh's own failure, saying Mason tried to read why and couldn't."""
+    [ran] = failure.diagnostics
+    [read] = lookup.diagnostics
+    return WorkspaceError(
+        f"{ran.message}\nMason couldn't read the pipelines' errors to say why: {read.message}"
+    )
 
 
 def refresh_failure(message: str) -> Diagnostic:

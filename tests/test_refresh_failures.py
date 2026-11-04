@@ -261,3 +261,26 @@ def test_each_failed_flow_in_the_update_is_kept_once():
 
 def test_no_events_means_no_errors():
     assert failed_update_errors([]) == []
+
+
+def test_a_failed_lookup_of_the_pipelines_errors_is_reported(
+    project: Path, monkeypatch: pytest.MonkeyPatch
+):
+    envelope = deploy(project, FailingRefresh([], unreadable=True), monkeypatch)
+
+    [diagnostic] = envelope["diagnostics"]
+    assert diagnostic["rule"] == "MSN904"
+    assert "TERMINATED FAILED" in diagnostic["message"]
+    assert "couldn't read the pipelines' errors" in diagnostic["message"]
+    assert "list-pipeline-events failed" in diagnostic["message"]
+
+
+@pytest.mark.parametrize("message", [EXPECTATION_FIRED, COLUMN_MISSING])
+def test_a_recovery_fix_links_to_the_guide_by_full_url(
+    project: Path, monkeypatch: pytest.MonkeyPatch, message: str
+):
+    envelope = deploy(project, FailingRefresh([message]), monkeypatch)
+
+    [diagnostic] = envelope["diagnostics"]
+    assert "https://" in diagnostic["fix"]
+    assert diagnostic["fix"].rstrip(".").endswith("guides/recover-from-a-failed-refresh.md")
