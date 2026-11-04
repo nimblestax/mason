@@ -323,7 +323,7 @@ def test_a_domain_with_capitals_is_read_in_lowercase(project: Path):
     dev, prod = compiles_in_every_environment(project)
     assert "dev_Sales.silver.orders" in dev
     assert "prod_Sales.silver.orders" in prod
-    bundle = (project / "build/databricks.yml").read_text()
+    bundle = (project / "build/databricks.yaml").read_text()
     declared = set(yaml.safe_load(bundle)["variables"])
     assert set(re.findall(r"\$\{var\.(\w+)\}", bundle)) <= declared
 

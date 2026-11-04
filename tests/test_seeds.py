@@ -111,7 +111,7 @@ def test_a_domain_with_only_seeds_still_gets_a_pipeline_that_runs_before_gold(pr
 
     assert mason(project, "compile").exit_code == 0
 
-    bundle = yaml.safe_load((project / "build/databricks.yml").read_text())
+    bundle = yaml.safe_load((project / "build/databricks.yaml").read_text())
     assert "sales_ingest" in bundle["resources"]["pipelines"]
     tasks = {t["task_key"]: t for t in bundle["resources"]["jobs"]["refresh"]["tasks"]}
     assert tasks["sales_gold"]["depends_on"] == [{"task_key": "sales_ingest"}]

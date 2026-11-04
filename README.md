@@ -1,8 +1,8 @@
 <h1 align=center><code>mason</code></h1>
 
 <div align=center>
-  <a href=https://github.com/nimblestax/mason-core/actions/workflows/ci.yml>
-    <img src=https://github.com/nimblestax/mason-core/actions/workflows/ci.yml/badge.svg alt="build status">
+  <a href=https://github.com/nimblestax/mason-core/actions/workflows/ci.yaml>
+    <img src=https://github.com/nimblestax/mason-core/actions/workflows/ci.yaml/badge.svg alt="build status">
   </a>
   <a href=LICENSE>
     <img src=https://img.shields.io/badge/license-Apache%202.0-blue.svg alt="Apache 2.0 license">
