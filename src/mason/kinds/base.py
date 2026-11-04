@@ -8,8 +8,9 @@ from pydantic_core import PydanticCustomError
 
 STRICT = ConfigDict(extra="forbid", frozen=True, strict=True)
 
-# A plain column name, which generated SQL can use as written.
-ColumnName = Annotated[str, Field(pattern=r"^[A-Za-z_][A-Za-z0-9_]*$")]
+# Mason writes table, column and catalog names into SQL unquoted, so each must be an identifier.
+IDENTIFIER = r"^[A-Za-z_][A-Za-z0-9_]*$"
+Identifier = Annotated[str, Field(pattern=IDENTIFIER)]
 
 # A config file may end in either, as YAML tools accept both.
 CONFIG_SUFFIXES = (".yaml", ".yml")

@@ -78,6 +78,7 @@ Rule IDs are `MSN` plus three digits. An ID never changes meaning, and a retired
 | `MSN114` | `seed-row-mismatch` | A row of a Seed's file has the wrong number of values, or a value that doesn't fit its column's type. |
 | `MSN115` | `unsupported-seed-type` | A Seed's column has a type Mason can't check values against. |
 | `MSN116` | `invalid-expectation` | An Expectation's `expect` isn't one SQL condition on one row: it doesn't parse, or it holds a query, an aggregate, a window function, a comment or an alias. |
+| `MSN117` | `invalid-name` | A config file's name isn't an identifier, so the table named after it can't be written in SQL: it must hold only letters, digits and underscores, and not start with a digit. |
 | `MSN118` | `invalid-delete-when` | A Source's `silver.delete_when` isn't one SQL condition on one row, for the same reasons as `MSN116`. |
 | `MSN119` | `invalid-sequence-by` | A Source's `silver.sequence_by` isn't one SQL expression on one row, such as `updated_at` or `struct(updated_at, seq)`: it doesn't parse, or it holds a query, an aggregate, a window function, a comment or an alias. |
 | `MSN120` | `duplicate-config-file` | Two config files share a name in one folder, such as `orders.yaml` and `orders.yml`. Mason reads either ending, and writes `.yaml`. |

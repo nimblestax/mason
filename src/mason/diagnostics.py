@@ -25,6 +25,7 @@ RULES = {
     "MSN114": "seed-row-mismatch",
     "MSN115": "unsupported-seed-type",
     "MSN116": "invalid-expectation",
+    "MSN117": "invalid-name",
     "MSN118": "invalid-delete-when",
     "MSN119": "invalid-sequence-by",
     "MSN120": "duplicate-config-file",

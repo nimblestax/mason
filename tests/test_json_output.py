@@ -232,6 +232,7 @@ REGISTERED_RULES = {
     "MSN114": "seed-row-mismatch",
     "MSN115": "unsupported-seed-type",
     "MSN116": "invalid-expectation",
+    "MSN117": "invalid-name",
     "MSN118": "invalid-delete-when",
     "MSN119": "invalid-sequence-by",
     "MSN120": "duplicate-config-file",
@@ -312,6 +313,7 @@ INVALID_PROJECTS = {
         "format: json\n",
         "format: json\nsilver:\n  expectations:\n    - name: bad\n      expect: amount >\n",
     ),
+    "MSN117": seed("code: STRING", "code\nAU\n", name="vat-rates"),
     "MSN118": replacing(
         SOURCE,
         "format: json\n",

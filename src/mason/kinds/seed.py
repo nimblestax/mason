@@ -11,8 +11,8 @@ from typing import Annotated, Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from mason.diagnostics import Diagnostic, error
-from mason.kinds.base import STRICT, ColumnName, ExactInteger, InDomain
-from mason.statements import listed, statement
+from mason.kinds.base import STRICT, ExactInteger, Identifier, InDomain
+from mason.statements import listed, statement, string_literal
 
 KIND = "seed"
 FOLDER = "seeds"
@@ -38,7 +38,7 @@ class SeedV1(InDomain):
     file: str = Field(
         pattern=r"^[^/\\]+\.csv$", description="The data file, in the same folder as this file."
     )
-    columns: dict[ColumnName, str] = Field(
+    columns: dict[Identifier, str] = Field(
         min_length=1,
         # Without it, the schema would let a column name that isn't an identifier through.
         json_schema_extra={"additionalProperties": False},
@@ -210,11 +210,7 @@ CHECKS: dict[str, Callable[[str], bool]] = {
 
 
 def _literal(value: str | None) -> str:
-    if value is None:
-        return "NULL"
-    escaped = value.replace("\\", "\\\\").replace("'", "\\'")
-    # Escaped so a value can't read as a pipeline placeholder, which is substituted inside strings.
-    return "'" + escaped.replace("${", "\\u0024{") + "'"
+    return "NULL" if value is None else string_literal(value)
 
 
 def _missing_file(file: str, data: str) -> Diagnostic:

@@ -9,7 +9,7 @@ from pydantic_core import PydanticCustomError
 
 from mason.conditions import row_condition_problem, row_expression_problem
 from mason.diagnostics import Diagnostic
-from mason.kinds.base import STRICT, ColumnName, ExactInteger, InDomain, unique
+from mason.kinds.base import STRICT, ExactInteger, Identifier, InDomain, unique
 from mason.statements import listed, statement
 
 KIND = "source"
@@ -60,7 +60,7 @@ class SilverV1(BaseModel):
     model_config = STRICT
 
     # `keys` comes first, so the checks of the fields after it can see it.
-    keys: Annotated[list[ColumnName], Field(min_length=1)] | None = Field(
+    keys: Annotated[list[Identifier], Field(min_length=1)] | None = Field(
         default=None,
         json_schema_extra={"uniqueItems": True},
         description="The columns that identify a row, which turn on upserts.",
