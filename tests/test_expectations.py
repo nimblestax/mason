@@ -164,6 +164,7 @@ def failures(project: Path) -> list[dict]:
         "amount > avg(amount)",  # an aggregate
         "row_number() OVER (ORDER BY id) = 1",  # a window
         "amount > 0 -- positive",  # a comment would swallow the rest of the generated line
+        "amount > 0 positive",  # a trailing word reads as an alias
     ],
 )
 def test_an_expectation_that_isnt_a_condition_on_one_row_fails_validation_with_a_rule_id(

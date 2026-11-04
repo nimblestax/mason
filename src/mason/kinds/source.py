@@ -7,9 +7,9 @@ from typing import Annotated, Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
 from pydantic_core import PydanticCustomError
 
-from mason.conditions import row_condition_problem
+from mason.conditions import row_condition_problem, row_expression_problem
 from mason.diagnostics import Diagnostic
-from mason.kinds.base import STRICT, ExactInteger, InDomain, unique
+from mason.kinds.base import STRICT, ColumnName, ExactInteger, InDomain, unique
 from mason.statements import listed, statement
 
 KIND = "source"
@@ -60,7 +60,7 @@ class SilverV1(BaseModel):
     model_config = STRICT
 
     # `keys` comes first, so the checks of the fields after it can see it.
-    keys: Annotated[list[Text], Field(min_length=1)] | None = Field(
+    keys: Annotated[list[ColumnName], Field(min_length=1)] | None = Field(
         default=None,
         json_schema_extra={"uniqueItems": True},
         description="The columns that identify a row, which turn on upserts.",
@@ -122,6 +122,40 @@ class SilverV1(BaseModel):
     def _only_with_keys(cls, value: Any, info: ValidationInfo) -> Any:
         if "keys" in info.data and not info.data["keys"]:
             raise _upsert_field_without_keys(str(info.field_name))
+        return value
+
+    # Each goes into the generated Auto CDC flow as written, so it must be one piece of SQL.
+    @field_validator("sequence_by")
+    @classmethod
+    def _sequence_by_is_an_expression_on_one_row(cls, value: str | None) -> str | None:
+        problem = value and row_expression_problem(value)
+        if problem:
+            raise PydanticCustomError(
+                "MSN119",
+                "`silver.sequence_by` isn't one SQL expression on one row. {problem}",
+                {
+                    "problem": problem,
+                    "fix": "Write `sequence_by` as the column that orders changes, such as"
+                    " `updated_at`, or one expression on the row's own columns, such as"
+                    " `struct(updated_at, seq)`.",
+                },
+            )
+        return value
+
+    @field_validator("delete_when")
+    @classmethod
+    def _delete_when_is_a_condition_on_one_row(cls, value: str | None) -> str | None:
+        problem = value and row_condition_problem(value)
+        if problem:
+            raise PydanticCustomError(
+                "MSN118",
+                "`silver.delete_when` isn't one SQL condition on one row. {problem}",
+                {
+                    "problem": problem,
+                    "fix": "Write `delete_when` as one condition on the row's own columns,"
+                    " such as `op = 'D'`.",
+                },
+            )
         return value
 
 
