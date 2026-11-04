@@ -386,7 +386,7 @@ def test_the_docs_state_every_exit_code_and_every_rule():
     assert "| 1 | Rule failures" in docs
     assert "| 2 | Usage or environment error" in docs
     for code, rule in RULES.items():
-        assert f"| `{code}` | `{rule.name}` |" in docs
+        assert f"| [`{code}`](rules/{code.lower()}.md) | `{rule.name}` |" in docs
 
 
 def test_help_states_the_exit_codes():
