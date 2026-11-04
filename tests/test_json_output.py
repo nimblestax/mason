@@ -232,7 +232,7 @@ REGISTERED_RULES = {
     "MSN114": "seed-row-mismatch",
     "MSN115": "unsupported-seed-type",
     "MSN116": "invalid-expectation",
-    "MSN120": "yml-config-file",
+    "MSN120": "duplicate-config-file",
     "MSN121": "unlisted-domain-folder",
     "MSN201": "unresolved-logical-name",
     "MSN202": "duplicate-table",
@@ -308,7 +308,9 @@ INVALID_PROJECTS = {
         "format: json\n",
         "format: json\nsilver:\n  expectations:\n    - name: bad\n      expect: amount >\n",
     ),
-    "MSN120": lambda project: (project / SOURCE).rename(project / SOURCE.replace(".yaml", ".yml")),
+    "MSN120": lambda project: (project / SOURCE.replace(".yaml", ".yml")).write_text(
+        (project / SOURCE).read_text()
+    ),
     "MSN121": lambda project: (project / "domains/hr").mkdir(),
     "MSN201": lambda project: (project / f"{MODEL}.sql").write_text("SELECT * FROM a.b.c"),
     "MSN202": seed("code: STRING", "code\nAU\n", name="orders"),

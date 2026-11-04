@@ -78,7 +78,7 @@ Rule IDs are `MSN` plus three digits. An ID never changes meaning, and a retired
 | `MSN114` | `seed-row-mismatch` | A row of a Seed's file has the wrong number of values, or a value that doesn't fit its column's type. |
 | `MSN115` | `unsupported-seed-type` | A Seed's column has a type Mason can't check values against. |
 | `MSN116` | `invalid-expectation` | An Expectation's `expect` isn't one SQL condition on one row: it doesn't parse, or it holds a query, an aggregate, a window function or a comment. |
-| `MSN120` | `yml-config-file` | A config file in a Domain's `sources`, `seeds` or `models` folder ends in `.yml`, which Mason never reads. |
+| `MSN120` | `duplicate-config-file` | Two config files share a name in one folder, such as `orders.yaml` and `orders.yml`. Mason reads either ending, and writes `.yaml`. |
 | `MSN121` | `unlisted-domain-folder` | A folder under `domains/` isn't listed in `domains` in `mason.platform.yaml`, in the same case, so nothing in it is validated or deployed. |
 | `MSN201` | `unresolved-logical-name` | SQL reads a table that isn't in the project. |
 | `MSN202` | `duplicate-table` | Two tables in one Domain would share a name: a Seed and a Source, or a table and a Source's Quarantine table. |

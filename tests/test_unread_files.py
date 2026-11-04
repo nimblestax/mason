@@ -1,4 +1,4 @@
-"""Files in a project that Mason would never read fail, rather than being skipped in silence."""
+"""Config files are read whether they end in `.yaml` or `.yml`, and unread folders fail."""
 
 import json
 from pathlib import Path
@@ -35,25 +35,37 @@ def list_domains(project: Path, *domains: str) -> None:
     platform.write_text(platform.read_text().replace("  - sales\n", listed))
 
 
-def test_a_yml_source_fails_with_a_fix_naming_its_yaml_name(project: Path):
+def compiled(project: Path) -> str:
+    result = mason(project, "compile", "--env", "dev")
+    assert result.exit_code == 0, result.output
+    return result.stdout
+
+
+def test_a_yml_source_is_read_like_a_yaml_one(project: Path):
     sources = project / "domains/sales/sources"
     (sources / "orders.yaml").rename(sources / "orders.yml")
 
-    [failure] = failures(project, "MSN120")
+    assert "STREAMING TABLE dev_sales.bronze.orders" in compiled(project)
 
-    assert failure["name"] == "yml-config-file"
-    assert failure["file"] == "domains/sales/sources/orders.yml"
-    assert "orders.yaml" in failure["fix"]
+
+def test_a_yml_model_is_read_and_its_sql_has_a_config_file(project: Path):
+    models = project / "domains/sales/models"
+    (models / "fct_orders.yaml").rename(models / "fct_orders.yml")
+
+    assert "MATERIALIZED VIEW dev_sales.gold.fct_orders" in compiled(project)
 
 
 @pytest.mark.parametrize("folder", ["sources", "seeds", "models"])
-def test_a_yml_file_fails_in_every_domain_folder(project: Path, folder: str):
+def test_a_name_with_both_a_yaml_and_a_yml_file_fails_once(project: Path, folder: str):
     (project / "domains/sales" / folder).mkdir(exist_ok=True)
-    (project / "domains/sales" / folder / "extra.yml").write_text("kind: source\n")
+    for suffix in (".yaml", ".yml"):
+        (project / "domains/sales" / folder / f"extra{suffix}").write_text("kind: source\n")
 
     [failure] = failures(project, "MSN120")
 
+    assert failure["name"] == "duplicate-config-file"
     assert failure["file"] == f"domains/sales/{folder}/extra.yml"
+    assert "extra.yaml" in failure["message"]
 
 
 def test_a_domain_folder_the_platform_contract_does_not_list_fails(project: Path):

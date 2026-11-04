@@ -25,7 +25,7 @@ RULES = {
     "MSN114": "seed-row-mismatch",
     "MSN115": "unsupported-seed-type",
     "MSN116": "invalid-expectation",
-    "MSN120": "yml-config-file",
+    "MSN120": "duplicate-config-file",
     "MSN121": "unlisted-domain-folder",
     "MSN201": "unresolved-logical-name",
     "MSN202": "duplicate-table",

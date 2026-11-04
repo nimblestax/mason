@@ -6,7 +6,7 @@ from typing import Any
 
 from mason.diagnostics import Diagnostic, error
 from mason.kinds import IN_DOMAINS, platform
-from mason.kinds.base import InDomain
+from mason.kinds.base import InDomain, config_files
 from mason.kinds.model import Model
 from mason.kinds.platform import Platform
 from mason.kinds.seed import Seed
@@ -30,10 +30,11 @@ def load(root: Path) -> Project:
     for domain in contract.domains:
         for kind in IN_DOMAINS:
             folder = root / "domains" / domain / kind.FOLDER
-            problems += [_yml(root, file) for file in sorted(folder.glob("*.yml"))]
+            files, duplicates = _one_per_name(root, config_files(folder))
+            problems += duplicates
             # `Any`, because each Kind loads its own model.
             documents: list[Any] = []
-            for file in sorted(folder.glob("*.yaml")):
+            for file in files:
                 result = config.read(root, file, kind.KIND)
                 if isinstance(result, list):
                     problems += result
@@ -52,12 +53,24 @@ def load(root: Path) -> Project:
     )
 
 
-def _yml(root: Path, file: Path) -> Diagnostic:
+def _one_per_name(root: Path, files: list[Path]) -> tuple[list[Path], list[Diagnostic]]:
+    """A name's one config file. Both `orders.yaml` and `orders.yml` would be two tables."""
+    by_name: dict[str, list[Path]] = {}
+    for file in files:
+        by_name.setdefault(file.stem, []).append(file)
+    single = [found[0] for found in by_name.values() if len(found) == 1]
+    both = [_duplicate(root, found) for found in by_name.values() if len(found) > 1]
+    return single, both
+
+
+def _duplicate(root: Path, files: list[Path]) -> Diagnostic:
+    first, *rest = sorted(files, key=lambda file: file.suffix != ".yaml")
     return error(
         "MSN120",
-        file.relative_to(root).as_posix(),
-        f"Mason reads only `.yaml` files, so it never reads {file.name}.",
-        f"Rename it to {file.stem}.yaml.",
+        rest[-1].relative_to(root).as_posix(),
+        f"{first.name} and {', '.join(file.name for file in rest)} both configure"
+        f" {first.stem}, so Mason can't tell which one is meant.",
+        "Keep one of them, and delete or rename the other.",
     )
 
 
