@@ -27,6 +27,8 @@ RULES = {
     "MSN116": "invalid-expectation",
     "MSN118": "invalid-delete-when",
     "MSN119": "invalid-sequence-by",
+    "MSN120": "duplicate-config-file",
+    "MSN121": "unlisted-domain-folder",
     "MSN201": "unresolved-logical-name",
     "MSN202": "duplicate-table",
     "MSN203": "unparseable-sql",

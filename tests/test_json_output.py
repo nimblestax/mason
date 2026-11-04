@@ -234,6 +234,8 @@ REGISTERED_RULES = {
     "MSN116": "invalid-expectation",
     "MSN118": "invalid-delete-when",
     "MSN119": "invalid-sequence-by",
+    "MSN120": "duplicate-config-file",
+    "MSN121": "unlisted-domain-folder",
     "MSN201": "unresolved-logical-name",
     "MSN202": "duplicate-table",
     "MSN203": "unparseable-sql",
@@ -321,6 +323,10 @@ INVALID_PROJECTS = {
         "format: json\n",
         "format: json\nsilver:\n  keys: [order_id]\n  sequence_by: updated_at DESC\n",
     ),
+    "MSN120": lambda project: (project / SOURCE.replace(".yaml", ".yml")).write_text(
+        (project / SOURCE).read_text()
+    ),
+    "MSN121": lambda project: (project / "domains/hr").mkdir(),
     "MSN201": lambda project: (project / f"{MODEL}.sql").write_text("SELECT * FROM a.b.c"),
     "MSN202": seed("code: STRING", "code\nAU\n", name="orders"),
     "MSN203": lambda project: (project / f"{MODEL}.sql").write_text("SELECT FROM WHERE"),

@@ -80,6 +80,8 @@ Rule IDs are `MSN` plus three digits. An ID never changes meaning, and a retired
 | `MSN116` | `invalid-expectation` | An Expectation's `expect` isn't one SQL condition on one row: it doesn't parse, or it holds a query, an aggregate, a window function, a comment or an alias. |
 | `MSN118` | `invalid-delete-when` | A Source's `silver.delete_when` isn't one SQL condition on one row, for the same reasons as `MSN116`. |
 | `MSN119` | `invalid-sequence-by` | A Source's `silver.sequence_by` isn't one SQL expression on one row, such as `updated_at` or `struct(updated_at, seq)`: it doesn't parse, or it holds a query, an aggregate, a window function, a comment or an alias. |
+| `MSN120` | `duplicate-config-file` | Two config files share a name in one folder, such as `orders.yaml` and `orders.yml`. Mason reads either ending, and writes `.yaml`. |
+| `MSN121` | `unlisted-domain-folder` | A folder under `domains/` isn't listed in `domains` in `mason.platform.yaml`, in the same case, so nothing in it is validated or deployed. |
 | `MSN201` | `unresolved-logical-name` | SQL reads a table that isn't in the project. |
 | `MSN202` | `duplicate-table` | Two tables in one Domain would share a name: a Seed and a Source, or a table and a Source's Quarantine table. |
 | `MSN203` | `unparseable-sql` | A Gold Model's SQL doesn't parse as one Databricks SQL query. |

@@ -11,6 +11,14 @@ STRICT = ConfigDict(extra="forbid", frozen=True, strict=True)
 # A plain column name, which generated SQL can use as written.
 ColumnName = Annotated[str, Field(pattern=r"^[A-Za-z_][A-Za-z0-9_]*$")]
 
+# A config file may end in either, as YAML tools accept both.
+CONFIG_SUFFIXES = (".yaml", ".yml")
+
+
+def config_files(folder: Path) -> list[Path]:
+    """Every config file in a folder, `.yaml` or `.yml`, in name order."""
+    return sorted(file for file in folder.glob("*") if file.suffix in CONFIG_SUFFIXES)
+
 
 def _exact_integer(value: Any) -> Any:
     # Strict mode still lets `true` through for an integer `Literal`, because `True == 1` in Python.
