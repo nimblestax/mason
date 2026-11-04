@@ -9,6 +9,7 @@ from pydantic_core import PydanticCustomError
 
 from mason.diagnostics import Diagnostic
 from mason.kinds.base import STRICT, ExactInteger, InDomain, unique
+from mason.statements import statement
 
 KIND = "source"
 FOLDER = "sources"
@@ -129,30 +130,48 @@ def problems(root: Path, folder: Path, sources: list[Source]) -> list[Diagnostic
 
 
 def generate(source: Source, path: str, bronze: str, silver: str) -> str:
+    """Bronze, then the statements that write silver, each followed by a blank line."""
+    return "\n\n".join([_bronze(source, path, bronze), *_silver(source, bronze, silver)]) + "\n"
+
+
+def _bronze(source: Source, path: str, bronze: str) -> str:
     """Bronze keeps every row as it landed and can't be reset, so it can always be replayed."""
-    return f"""CREATE OR REFRESH STREAMING TABLE {bronze}
-TBLPROPERTIES ('pipelines.reset.allowed' = 'false')
-AS SELECT *
-FROM STREAM read_files('{path}', format => '{source.format}');
-
-{_silver(source, bronze, silver)}"""
-
-
-def _silver(source: Source, bronze: str, silver: str) -> str:
-    keys = source.silver.keys
-    if not keys:
-        return f"""CREATE OR REFRESH STREAMING TABLE {silver}
-AS SELECT *
-FROM STREAM({bronze});
-"""
-    delete = (
-        f"APPLY AS DELETE WHEN {source.silver.delete_when}\n" if source.silver.delete_when else ""
+    return statement(
+        f"CREATE OR REFRESH STREAMING TABLE {bronze}",
+        "TBLPROPERTIES ('pipelines.reset.allowed' = 'false')",
+        "AS SELECT *",
+        f"FROM STREAM read_files('{path}', format => '{source.format}')",
     )
-    return f"""CREATE OR REFRESH STREAMING TABLE {silver};
 
-CREATE FLOW upsert_{source.name} AS AUTO CDC INTO {silver}
-FROM STREAM({bronze})
-KEYS ({", ".join(keys)})
-{delete}SEQUENCE BY {source.silver.sequence_by}
-STORED AS SCD TYPE {source.silver.scd};
-"""
+
+def _silver(source: Source, bronze: str, silver: str) -> list[str]:
+    if not source.silver.keys:
+        return [_append(bronze, silver)]
+    return [
+        statement(f"CREATE OR REFRESH STREAMING TABLE {silver}"),
+        _upsert(source, bronze, silver),
+    ]
+
+
+def _append(bronze: str, silver: str) -> str:
+    return statement(
+        f"CREATE OR REFRESH STREAMING TABLE {silver}",
+        "AS SELECT *",
+        f"FROM STREAM({bronze})",
+    )
+
+
+def _upsert(source: Source, bronze: str, silver: str) -> str:
+    settings = source.silver
+    return statement(
+        f"CREATE FLOW upsert_{source.name} AS AUTO CDC INTO {silver}",
+        f"FROM STREAM({bronze})",
+        f"KEYS ({', '.join(settings.keys or [])})",
+        _delete_when(settings.delete_when),
+        f"SEQUENCE BY {settings.sequence_by}",
+        f"STORED AS SCD TYPE {settings.scd}",
+    )
+
+
+def _delete_when(condition: str | None) -> str | None:
+    return f"APPLY AS DELETE WHEN {condition}" if condition else None

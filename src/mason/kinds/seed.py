@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from mason.diagnostics import Diagnostic, error
 from mason.kinds.base import STRICT, ExactInteger, InDomain
+from mason.statements import listed, statement
 
 KIND = "seed"
 FOLDER = "seeds"
@@ -93,21 +94,24 @@ def _data_problems(root: Path, seed: Seed) -> list[Diagnostic]:
 
 def generate(seed: Seed, target: str) -> str:
     """The rows live in the definition, so any edit to the file replaces the whole table."""
-    selected = ",\n".join(
-        f"  CAST(`{name}` AS {sql_type}) AS `{name}`" for name, sql_type in seed.columns.items()
-    )
-    aliases = ", ".join(f"`{name}`" for name in seed.columns)
     found = seed.rows
     no_rows = (None,) * len(seed.columns)
-    rows = ",\n".join(f"  ({', '.join(map(_literal, row))})" for row in found or (no_rows,))
-    keep = "" if found else "\nWHERE false"
-    return f"""CREATE OR REFRESH MATERIALIZED VIEW {target}
-AS SELECT
-{selected}
-FROM VALUES
-{rows}
-AS seed({aliases}){keep};
-"""
+    columns = seed.columns.items()
+    sql = statement(
+        f"CREATE OR REFRESH MATERIALIZED VIEW {target}",
+        "AS SELECT",
+        listed(f"CAST(`{name}` AS {sql_type}) AS `{name}`" for name, sql_type in columns),
+        "FROM VALUES",
+        listed(f"({', '.join(map(_literal, row))})" for row in found or (no_rows,)),
+        f"AS seed({', '.join(f'`{name}`' for name in seed.columns)})",
+        _empty_filter(found),
+    )
+    return sql + "\n"
+
+
+def _empty_filter(rows: tuple[tuple[str | None, ...], ...]) -> str | None:
+    """With no rows, one row of NULLs gives the columns their types, and this filters it out."""
+    return None if rows else "WHERE false"
 
 
 def _read(data: Path) -> tuple[list[str], list[tuple[int, list[str]]]]:

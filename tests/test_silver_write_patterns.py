@@ -7,6 +7,7 @@ import pytest
 from typer.testing import CliRunner
 
 from mason.cli import app
+from mason.kinds.source import _delete_when
 
 runner = CliRunner()
 
@@ -178,3 +179,8 @@ def test_schema_names_the_fields_of_the_silver_block_for_a_person():
 
     for field in ("keys", "sequence_by", "scd", "delete_when"):
         assert f"`{field}`" in described
+
+
+def test_delete_when_is_a_line_only_when_a_condition_is_given():
+    assert _delete_when(None) is None
+    assert _delete_when("op = 'D'") == "APPLY AS DELETE WHEN op = 'D'"
