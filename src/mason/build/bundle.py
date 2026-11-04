@@ -7,6 +7,10 @@ from mason.load.project import Project
 
 REFRESH_JOB = "refresh"
 
+# One retry survives a one-off blip. An error a retry can't fix, such as a bad row in append-only
+# bronze, then fails in about a minute instead of waiting through the default five retries.
+UPDATE_RETRIES = {"pipelines.numUpdateRetryAttempts": "1"}
+
 
 def render(project: Project) -> str:
     platform = project.platform
@@ -54,7 +58,7 @@ def _pipeline(project: Project, domain: str, group: str) -> dict:
         "serverless": True,
         "channel": "CURRENT",
         "libraries": [{"glob": {"include": f"src/{domain}/{group}/**"}}],
-        "configuration": {key: f"${{var.{key}}}" for key in keys},
+        "configuration": {**{key: f"${{var.{key}}}" for key in keys}, **UPDATE_RETRIES},
     }
 
 

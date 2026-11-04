@@ -43,6 +43,9 @@ RULES = {
     "MSN903": "databricks-cli-missing",
     "MSN904": "databricks-command-failed",
     "MSN905": "unexpected-error",
+    "MSN906": "pipeline-column-not-found",
+    "MSN907": "expectation-failed",
+    "MSN908": "pipeline-failed",
 }
 
 
