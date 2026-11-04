@@ -171,5 +171,5 @@ def test_a_project_with_no_domains_compiles_to_a_package_with_no_pipelines(proje
     result = mason(project, "compile")
 
     assert result.exit_code == 0, result.output
-    bundle = yaml.safe_load((project / "build/databricks.yml").read_text())
+    bundle = yaml.safe_load((project / "build/databricks.yaml").read_text())
     assert bundle["resources"]["pipelines"] == {}

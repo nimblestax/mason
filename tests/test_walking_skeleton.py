@@ -161,7 +161,7 @@ def test_deploy_ships_the_package_and_then_refreshes_it(project: Path):
         ("deploy", project / "build", "dev"),
         ("run", project / "build", "dev", "refresh"),
     ]
-    assert (project / "build/databricks.yml").exists()
+    assert (project / "build/databricks.yaml").exists()
 
 
 def test_deploy_refuses_a_project_that_fails_validation(project: Path):
@@ -184,8 +184,8 @@ def test_a_failed_deploy_never_refreshes(project: Path):
 
 
 def test_github_ci_files_are_thin_calls_to_mason_with_no_secret(project: Path):
-    pull_request = (project / ".github/workflows/mason-pull-request.yml").read_text()
-    merge = (project / ".github/workflows/mason-merge.yml").read_text()
+    pull_request = (project / ".github/workflows/mason-pull-request.yaml").read_text()
+    merge = (project / ".github/workflows/mason-merge.yaml").read_text()
 
     assert "mason validate" in pull_request
     assert "mason deploy --env dev" in merge
@@ -198,7 +198,7 @@ def test_generated_code_is_uploaded_even_though_init_gitignores_the_package(proj
     mason(project, "compile")
 
     assert "build/" in (project / ".gitignore").read_text()
-    package = yaml.safe_load((project / "build/databricks.yml").read_text())
+    package = yaml.safe_load((project / "build/databricks.yaml").read_text())
     assert package["sync"]["include"] == ["src/**"]
 
 

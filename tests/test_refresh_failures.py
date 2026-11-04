@@ -126,7 +126,7 @@ def test_with_no_pipeline_error_to_read_the_cli_output_is_reported(
 def test_a_pipeline_retries_a_failed_update_once_in_every_environment(project: Path):
     assert runner.invoke(cli.app, ["compile", "--project", str(project)]).exit_code == 0
 
-    bundle = yaml.safe_load((project / "build/databricks.yml").read_text())
+    bundle = yaml.safe_load((project / "build/databricks.yaml").read_text())
 
     for pipeline in bundle["resources"]["pipelines"].values():
         assert pipeline["configuration"]["pipelines.numUpdateRetryAttempts"] == "1"

@@ -46,7 +46,7 @@ def write_package(project: Project) -> Path:
         target = package / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content)
-    (package / "databricks.yml").write_text(bundle.render(project))
+    (package / "databricks.yaml").write_text(bundle.render(project))
     return package
 
 

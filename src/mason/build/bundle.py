@@ -1,4 +1,4 @@
-"""Writes `databricks.yml`: the resources, plus the placeholder values for each target."""
+"""Writes `databricks.yaml`: the resources, plus the placeholder values for each target."""
 
 import yaml
 

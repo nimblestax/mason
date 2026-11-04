@@ -46,7 +46,7 @@ def package(project: Path) -> tuple[str, dict]:
     result = mason(project, "compile")
     assert result.exit_code == 0, result.output
     code = (project / "build/src/sales/ingest/orders.sql").read_text()
-    return code, yaml.safe_load((project / "build/databricks.yml").read_text())
+    return code, yaml.safe_load((project / "build/databricks.yaml").read_text())
 
 
 def path_setting_per_target(bundle: dict) -> dict[str, str]:
