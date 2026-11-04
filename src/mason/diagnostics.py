@@ -7,7 +7,9 @@ from mason.registry import RULES
 RULE_FAILURE = 1
 USAGE_OR_ENVIRONMENT = 2
 
-DOCS = "https://github.com/nimblestax/mason-core/blob/main/docs/reference/json-output.md#rule-ids"
+# Where Mason's docs live, so every link in a diagnostic moves together when they move.
+DOCS_ROOT = "https://github.com/nimblestax/mason-core/blob/main/docs"
+DOCS = f"{DOCS_ROOT}/reference/json-output.md#rule-ids"
 
 
 @dataclass(frozen=True)

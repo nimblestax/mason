@@ -35,6 +35,6 @@ A delete with a bad or NULL key still reaches silver, where it matches no row an
 
 ## Changing a rule that quarantines
 
-Silver is a streaming table, so a new or changed `quarantine` rule only checks rows that arrive after the change. Rows already in silver that fail it stay there, and they also appear in the Quarantine table, which reads bronze from the start. After adding, removing or changing a `quarantine` rule, fully refresh the Source's silver table.
+Silver is a streaming table, so a new or changed `quarantine` rule only checks rows that arrive after the change. Rows already in silver that fail it stay there, and they also appear in the Quarantine table, which reads bronze from the start.
 
-A change to a `warn` or `fail` rule moves no rows, so it needs no refresh.
+A change to a `warn` or `fail` rule moves no rows.
